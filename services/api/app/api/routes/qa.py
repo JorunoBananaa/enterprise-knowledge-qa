@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.models.chat import ChatMessage, ChatSession, Citation
 from app.repositories.llm_config import get_active_llm_config, get_llm_config
+from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
     AskRequest,
     AskResponse,
@@ -36,11 +37,11 @@ def _first_line(text: str, max_len: int = 60) -> str:
 
 @router.get("/sessions", response_model=list[ChatSessionOut])
 def list_sessions(
-    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[ChatSessionOut]:
     """List all sessions belonging to the current user (newest first)."""
-    user_id: str = current_user["sub"]
+    user_id = str(current_user.id)
     sessions = (
         db.query(ChatSession)
         .filter(ChatSession.user_id == user_id)
@@ -68,11 +69,11 @@ def list_sessions(
 @router.post("/sessions", response_model=CreateSessionResponse)
 def create_session(
     payload: CreateSessionRequest,
-    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CreateSessionResponse:
     """Create a new empty chat session."""
-    user_id: str = current_user["sub"]
+    user_id = str(current_user.id)
     session = ChatSession(user_id=user_id, title=payload.title)
     db.add(session)
     db.commit()
@@ -83,11 +84,11 @@ def create_session(
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
 def get_session(
     session_id: int,
-    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ChatSessionDetail:
     """Get a single session with all its messages."""
-    user_id: str = current_user["sub"]
+    user_id = str(current_user.id)
     session = (
         db.query(ChatSession)
         .filter(ChatSession.id == session_id, ChatSession.user_id == user_id)
@@ -116,11 +117,11 @@ def get_session(
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(
     session_id: int,
-    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """Delete a session and all its messages."""
-    user_id: str = current_user["sub"]
+    user_id = str(current_user.id)
     session = (
         db.query(ChatSession)
         .filter(ChatSession.id == session_id, ChatSession.user_id == user_id)
@@ -137,11 +138,11 @@ def delete_session(
 @router.post("/ask", response_model=AskResponse)
 def ask_question(
     payload: AskRequest,
-    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> AskResponse:
     """Ask a question. If session_id is None a new session is created automatically."""
-    user_id: str = current_user["sub"]
+    user_id = str(current_user.id)
 
     # Resolve or create session
     if payload.session_id is not None:

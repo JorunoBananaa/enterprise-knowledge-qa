@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 LLM Factory – creates LangChain chat model instances from LLMConfig records.
 
@@ -13,8 +15,6 @@ Extending to a new provider:
 1. Add the provider key and mapping below.
 2. If not OpenAI-compatible, add the appropriate LangChain chat model class.
 """
-
-from __future__ import annotations
 
 from typing import Any
 

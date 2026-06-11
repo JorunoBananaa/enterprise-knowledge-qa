@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Form, Input, Button, Typography, Alert, Card } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { setToken } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";
+import { login, isSafeNext } from "@/lib/auth-client";
 
 const { Title, Text } = Typography;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,12 +22,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const data = await apiFetch<{ access_token: string }>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify(values),
-      });
-      setToken(data.access_token);
-      router.push("/qa");
+      await login(values.username, values.password);
+
+      const next = searchParams.get("next");
+      if (isSafeNext(next)) {
+        router.replace(next);
+      } else {
+        router.replace("/qa");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
     } finally {
@@ -115,5 +117,13 @@ export default function LoginPage() {
         </Form>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -15,7 +15,8 @@ import {
 } from "antd";
 import { SettingOutlined, FileTextOutlined } from "@ant-design/icons";
 import { apiFetch } from "@/lib/api";
-import { parseToken } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-client";
+import type { CurrentUser } from "@/lib/auth-client";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -219,7 +220,26 @@ function PersonalPromptPanel() {
 // ── Unified Prompt Page ──────────────────────────────────────────────
 
 export default function PromptsPage() {
-  const user = parseToken();
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((u) => {
+        setUser(u);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   const isAdmin = user?.role === "admin";
 
   const tabItems = [

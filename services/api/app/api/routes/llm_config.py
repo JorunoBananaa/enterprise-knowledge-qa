@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.messages import HumanMessage
 
-from app.api.deps import require_admin
+from app.api.deps import get_current_user, require_admin
 from app.repositories.llm_config import (
     create_llm_config,
     delete_llm_config,
@@ -15,6 +15,7 @@ from app.repositories.llm_config import (
     set_active_llm_config,
     update_llm_config,
 )
+from app.schemas.auth import CurrentUser
 from app.schemas.llm_config import (
     LLMConfigBrief,
     LLMConfigCreate,
@@ -28,9 +29,9 @@ router = APIRouter()
 
 # ── List all configs (admin only) ─────────────────────────────────────
 
-@router.get("/", response_model=list[LLMConfigResponse])
+@router.get("", response_model=list[LLMConfigResponse])
 def list_configs(
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> list[LLMConfigResponse]:
     configs = list_llm_configs()
     return [LLMConfigResponse.from_orm_obj(c) for c in configs]
@@ -39,7 +40,9 @@ def list_configs(
 # ── List brief configs (any authenticated user – for dropdown) ────────
 
 @router.get("/brief", response_model=list[LLMConfigBrief])
-def list_configs_brief() -> list[LLMConfigBrief]:
+def list_configs_brief(
+    _current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> list[LLMConfigBrief]:
     configs = list_llm_configs()
     return [LLMConfigBrief.from_orm_obj(c) for c in configs]
 
@@ -48,7 +51,7 @@ def list_configs_brief() -> list[LLMConfigBrief]:
 
 @router.get("/active", response_model=LLMConfigResponse | dict[str, str])
 def get_active(
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ):
     cfg = get_active_llm_config()
     if cfg is None:
@@ -58,10 +61,10 @@ def get_active(
 
 # ── Create ────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=LLMConfigResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=LLMConfigResponse, status_code=status.HTTP_201_CREATED)
 def create(
     payload: LLMConfigCreate,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
     cfg = create_llm_config(
         name=payload.name,
@@ -79,7 +82,7 @@ def create(
 def update(
     config_id: int,
     payload: LLMConfigUpdate,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
     # Snapshot current values for partial update
     current = get_llm_config(config_id)
@@ -98,7 +101,7 @@ def update(
 @router.post("/{config_id}/activate", response_model=LLMConfigResponse)
 def activate(
     config_id: int,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
     cfg = set_active_llm_config(config_id)
     if cfg is None:
@@ -111,7 +114,7 @@ def activate(
 @router.post("/{config_id}/test")
 def test_connectivity(
     config_id: int,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> dict:
     """Send a minimal ping to verify the LLM API is reachable and the key works."""
     cfg = get_llm_config(config_id)
@@ -141,7 +144,7 @@ def test_connectivity(
 @router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete(
     config_id: int,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> None:
     ok = delete_llm_config(config_id)
     if not ok:

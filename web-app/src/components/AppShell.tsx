@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layout, Menu, Button, Space, Typography, App } from "antd";
+import { Layout, Menu, Button, Space, Typography, App, Spin } from "antd";
 import {
   BookOutlined,
   QuestionCircleOutlined,
@@ -14,39 +14,42 @@ import {
   FileTextOutlined,
   RobotOutlined,
 } from "@ant-design/icons";
-import { clearToken, isLoggedIn, parseToken } from "@/lib/auth";
+import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
+import type { CurrentUser } from "@/lib/auth-client";
 
 const { Header, Content } = Layout;
 const { Text } = Typography;
 
-interface ShellUser {
-  username: string;
-  role: string;
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [authState, setAuthState] = useState<{
-    loggedIn: boolean;
-    user: ShellUser | null;
-  }>({
-    loggedIn: false,
-    user: null,
-  });
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setAuthState({
-      loggedIn: isLoggedIn(),
-      user: parseToken(),
-    });
-  }, [pathname]);
+    if (pathname === "/login") {
+      setLoading(false);
+      return;
+    }
 
-  const { loggedIn, user } = authState;
+    getCurrentUser()
+      .then((u) => {
+        setUser(u);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        router.replace(buildLoginUrl(pathname));
+      });
+  }, [pathname, router]);
 
-  const handleLogout = () => {
-    clearToken();
-    setAuthState({ loggedIn: false, user: null });
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // ignore network errors during logout
+    }
+    setUser(null);
     router.push("/login");
   };
 
@@ -62,18 +65,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const menuItems = useMemo(() => {
     const items: any[] = [
-      // ── 业务操作 ──
       {
         key: "/qa",
         icon: <QuestionCircleOutlined />,
         label: (
           <Link
             href="/qa"
-            style={{
-              fontSize: 18,
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
+            style={{ fontSize: 18, fontWeight: 700, whiteSpace: "nowrap" }}
           >
             企业知识问答
           </Link>
@@ -92,7 +90,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ];
 
     if (user?.role === "admin") {
-      // ── 系统配置 ──
       items.push(
         { type: "divider" as const },
         {
@@ -100,7 +97,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           icon: <RobotOutlined />,
           label: <Link href="/llm-configs">大模型管理</Link>,
         },
-        // ── 运营管理 ──
         {
           key: "/review",
           icon: <AuditOutlined />,
@@ -117,8 +113,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return items;
   }, [user]);
 
-  if (!loggedIn) {
+  if (pathname === "/login") {
     return <App>{children}</App>;
+  }
+
+  if (loading) {
+    return (
+      <Layout
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Spin size="large" />
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -133,13 +148,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            flex: 1,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
           <Menu
             theme="dark"
             mode="horizontal"
@@ -150,7 +159,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <Space>
           <Text style={{ color: "rgba(255,255,255,0.65)" }}>
-            <UserOutlined /> {user?.username}
+            <UserOutlined /> {user.display_name || user.username}
           </Text>
           <Button
             type="text"

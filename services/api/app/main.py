@@ -10,6 +10,7 @@ from app.api.routes.llm_config import router as llm_config_router
 from app.api.routes.prompts import router as prompts_router
 from app.api.routes.qa import router as qa_router
 from app.api.routes.review import router as review_router
+from app.api.routes.users import router as users_router
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 
@@ -20,7 +21,8 @@ def _seed_database() -> None:
 
     db = SessionLocal()
     try:
-        from app.models.user import User, UserRole
+        from app.core.security import hash_password
+        from app.models.user import User, UserRole, UserStatus
         from app.models.category import KnowledgeCategory
 
         # Seed MVP users
@@ -28,15 +30,19 @@ def _seed_database() -> None:
             db.add(User(
                 username="admin",
                 display_name="Administrator",
-                password_hash="dev-hash",
+                password_hash=hash_password("admin123"),
                 role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                token_version=0,
             ))
         if db.query(User).filter(User.username == "user").first() is None:
             db.add(User(
                 username="user",
                 display_name="Standard User",
-                password_hash="dev-hash",
+                password_hash=hash_password("user123"),
                 role=UserRole.STANDARD,
+                status=UserStatus.ACTIVE,
+                token_version=0,
             ))
         db.commit()
 
@@ -54,7 +60,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Enterprise Knowledge QA API", lifespan=lifespan)
+app = FastAPI(title="Enterprise Knowledge QA API", lifespan=lifespan, redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,6 +76,7 @@ app.include_router(llm_config_router, prefix="/llm-configs", tags=["llm-configs"
 app.include_router(prompts_router, prefix="/prompts", tags=["prompts"])
 app.include_router(qa_router, prefix="/qa", tags=["qa"])
 app.include_router(review_router, prefix="/review", tags=["review"])
+app.include_router(users_router, prefix="/users", tags=["users"])
 
 
 @app.get("/health")

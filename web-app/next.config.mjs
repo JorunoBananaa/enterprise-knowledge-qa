@@ -6,6 +6,7 @@ const apiProxyTarget = (
 const nextConfig = {
   output: "standalone",
   reactStrictMode: false,
+  skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: [],
   },
