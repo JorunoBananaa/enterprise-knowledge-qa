@@ -1,0 +1,14 @@
+{
+  "name": "enterprise-knowledge-qa",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "init": "cd web-app && pnpm install",
+    "dev:web-app": "pnpm --dir web-app dev",
+    "dev:services": "node scripts/dev-services.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

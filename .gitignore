@@ -3,8 +3,11 @@ __pycache__/
 *.pyo
 *.egg-info/
 .env
-storage/
 node_modules/
 .next/
 test.db
 .pytest_cache/
+
+services/api/storage/*
+!services/api/storage/uploads/
+!services/api/storage/uploads/README.md
