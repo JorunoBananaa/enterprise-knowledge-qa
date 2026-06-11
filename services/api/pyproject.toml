@@ -1,0 +1,31 @@
+[project]
+name = "enterprise-knowledge-qa-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic-settings",
+  "sqlalchemy",
+  "alembic",
+  "psycopg[binary]",
+  "pgvector",
+  "python-jose[cryptography]",
+  "passlib[bcrypt]",
+  "python-multipart",
+  "langchain",
+  "langchain-community",
+  "langchain-openai",
+  "langchain-anthropic",
+  "pypdf",
+  "python-docx",
+  "python-pptx",
+  "openpyxl",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx",
+]
+
+
