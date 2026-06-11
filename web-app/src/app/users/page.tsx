@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -59,6 +59,7 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
 
   // ── modals ──
@@ -73,6 +74,21 @@ export default function UsersPage() {
   const [editForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
 
+  // ── debounce search ───────────────────────────────────────────
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPagination((p) => ({ ...p, offset: 0 }));
+    }, 500);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search]);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -80,7 +96,7 @@ export default function UsersPage() {
         offset: String(pagination.offset),
         limit: String(pagination.limit),
       });
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       const res = await apiFetch<UserListResponse>(
         `/users?${params.toString()}`,
       );
@@ -91,7 +107,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, search, message]);
+  }, [pagination, debouncedSearch, message]);
 
   useEffect(() => {
     fetchUsers();
@@ -268,14 +284,10 @@ export default function UsersPage() {
 
       <Card>
         <div className="flex justify-between mb-4">
-          <Input.Search
+          <Input
             placeholder="搜索用户名或显示名称"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPagination({ offset: 0, limit: pagination.limit });
-            }}
-            onSearch={() => fetchUsers()}
+            onChange={(e) => setSearch(e.target.value)}
             style={{ width: 300 }}
             allowClear
           />

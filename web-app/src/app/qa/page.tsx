@@ -183,6 +183,10 @@ export default function QAPage() {
   const handleAsk = async () => {
     const q = question.trim();
     if (!q) return;
+    if (selectedLlmId === undefined) {
+      message.warning("请先选择大模型");
+      return;
+    }
     setQuestion("");
     setLoading(true);
 
@@ -376,11 +380,6 @@ export default function QAPage() {
                         >
                           {item.title || "新会话"}
                         </Text>
-                        <div>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {item.message_count} 条问答
-                          </Text>
-                        </div>
                       </div>
                       <Popconfirm
                         title="确定删除此会话？"
@@ -728,7 +727,7 @@ export default function QAPage() {
                 icon={<SendOutlined />}
                 loading={loading}
                 onClick={handleAsk}
-                disabled={!question.trim()}
+                disabled={!question.trim() || selectedLlmId === undefined}
                 style={{
                   borderRadius: `0 ${token.borderRadiusLG}px ${token.borderRadiusLG}px 0`,
                   minWidth: 80,

@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Form,
   Input,
   Button,
   Card,
-  Tag,
   Typography,
   Tabs,
-  Switch,
   Spin,
   App,
 } from "antd";
@@ -21,123 +19,62 @@ import type { CurrentUser } from "@/lib/auth-client";
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// ── Types ────────────────────────────────────────────────────────────
-
-interface SystemPromptItem {
-  id: number;
-  version: number;
-  content: string;
-  status: string;
-}
-
-interface UserPrompt {
-  id?: number;
-  content: string;
-  enabled: boolean;
-}
-
 // ── System Prompt Panel ──────────────────────────────────────────────
 
 function SystemPromptPanel() {
-  const [prompts, setPrompts] = useState<SystemPromptItem[]>([]);
   const [form] = Form.useForm();
-  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { message } = App.useApp();
 
-  const fetchPrompts = useCallback(async () => {
-    try {
-      const data = await apiFetch<SystemPromptItem[]>("/prompts/system");
-      setPrompts(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchPrompts();
-  }, [fetchPrompts]);
+    apiFetch<{ content: string }>("/prompts/system")
+      .then((data) => form.setFieldsValue({ content: data.content || "" }))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [form]);
 
-  const handleCreate = async (values: { content: string }) => {
-    if (!values.content.trim()) return;
-    setSubmitting(true);
+  const handleSave = async (values: { content: string }) => {
+    setSaving(true);
     try {
       await apiFetch("/prompts/system", {
-        method: "POST",
+        method: "PUT",
         body: JSON.stringify(values),
       });
-      form.resetFields();
-      message.success("新提示词版本已创建");
-      fetchPrompts();
+      message.success("系统提示词已保存");
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "创建提示词失败");
+      message.error(err instanceof Error ? err.message : "保存失败");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleActivate = async (version: number) => {
-    try {
-      await apiFetch(`/prompts/system/${version}/activate`, { method: "POST" });
-      message.success(`版本 ${version} 已激活`);
-      fetchPrompts();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "激活失败");
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Spin tip="加载中..." />
+      </div>
+    );
+  }
 
   return (
     <div>
       <Paragraph type="secondary" className="!mb-4">
-        系统提示词定义了回答的基础规则（引用、证据等），对所有问答生效。
+        系统提示词定义了回答的基础规则，对所有问答生效。
       </Paragraph>
 
-      <Card className="!mb-6">
-        <Form form={form} layout="vertical" onFinish={handleCreate}>
-          <Form.Item
-            name="content"
-            label="新提示词版本"
-            rules={[{ required: true, message: "请输入系统提示词内容" }]}
-          >
-            <TextArea rows={4} placeholder="请输入系统提示词内容..." />
+      <Card>
+        <Form form={form} layout="vertical" onFinish={handleSave}>
+          <Form.Item name="content" label="提示词内容">
+            <TextArea rows={6} placeholder="请输入系统提示词内容，可为空..." />
           </Form.Item>
           <Form.Item className="!mb-0">
-            <Button type="primary" htmlType="submit" loading={submitting}>
-              创建版本
+            <Button type="primary" htmlType="submit" loading={saving}>
+              {saving ? "保存中..." : "保存"}
             </Button>
           </Form.Item>
         </Form>
       </Card>
-
-      <Title level={5}>版本历史</Title>
-      {loading ? (
-        <Text type="secondary">加载中...</Text>
-      ) : prompts.length === 0 ? (
-        <Text type="secondary">暂无提示词版本。</Text>
-      ) : (
-        prompts.map((p) => (
-          <Card key={p.id} size="small" className="!mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Text strong>v{p.version}</Text>
-                <Tag color={p.status === "active" ? "green" : "default"}>
-                  {p.status === "active" ? "已激活" : p.status}
-                </Tag>
-              </div>
-              {p.status !== "active" && (
-                <Button size="small" onClick={() => handleActivate(p.version)}>
-                  激活
-                </Button>
-              )}
-            </div>
-            <pre className="whitespace-pre-wrap font-sans text-[13px] text-gray-500 m-0">
-              {p.content}
-            </pre>
-          </Card>
-        ))
-      )}
     </div>
   );
 }
@@ -151,18 +88,15 @@ function PersonalPromptPanel() {
   const { message } = App.useApp();
 
   useEffect(() => {
-    apiFetch<UserPrompt | { content: string; enabled: boolean }>("/prompts/me")
+    apiFetch<{ content: string }>("/prompts/me")
       .then((data) => {
-        form.setFieldsValue({
-          content: data.content || "",
-          enabled: data.enabled ?? true,
-        });
+        form.setFieldsValue({ content: data.content || "" });
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [form]);
 
-  const handleSave = async (values: { content: string; enabled: boolean }) => {
+  const handleSave = async (values: { content: string }) => {
     setSaving(true);
     try {
       await apiFetch("/prompts/me", {
@@ -188,27 +122,20 @@ function PersonalPromptPanel() {
   return (
     <div>
       <Paragraph type="secondary" className="!mb-4">
-        自定义回答的风格和格式，仅对你本人可见。系统规则（引用、证据）不会被覆盖。
+        自定义回答的风格和格式，仅对你本人可见。
       </Paragraph>
 
       <Card>
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Form.Item name="content" label="提示词内容">
             <TextArea
-              rows={5}
-              placeholder="例如：使用要点列表，答案不超过 200 字。"
+              rows={6}
+              placeholder="自定义回答的风格和格式，可为空..."
             />
-          </Form.Item>
-          <Form.Item
-            name="enabled"
-            label="启用个人提示词"
-            valuePropName="checked"
-          >
-            <Switch />
           </Form.Item>
           <Form.Item className="!mb-0">
             <Button type="primary" htmlType="submit" loading={saving}>
-              保存提示词
+              {saving ? "保存中..." : "保存"}
             </Button>
           </Form.Item>
         </Form>

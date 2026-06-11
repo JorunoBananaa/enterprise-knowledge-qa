@@ -2,20 +2,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user, require_admin
 from app.schemas.auth import CurrentUser
 from app.repositories.prompts import (
-    activate_prompt,
-    create_system_prompt,
+    get_system_prompt_content,
     get_user_prompt,
-    list_system_prompts,
+    upsert_system_prompt,
     upsert_user_prompt,
 )
 from app.schemas.prompt import (
-    SystemPromptCreate,
     SystemPromptResponse,
+    SystemPromptUpdate,
     UserPromptResponse,
     UserPromptUpdate,
 )
@@ -24,47 +23,29 @@ router = APIRouter()
 
 
 @router.get("/system")
-def get_system_prompts(
+def get_system_prompt(
     _admin: Annotated[CurrentUser, Depends(require_admin)],
-) -> list[SystemPromptResponse]:
-    """List all system prompt versions (admin only)."""
-    prompts = list_system_prompts()
-    return [SystemPromptResponse.from_orm_obj(p) for p in prompts]
+) -> SystemPromptResponse:
+    """Get current system prompt content (admin only)."""
+    return SystemPromptResponse(content=get_system_prompt_content())
 
 
-@router.post("/system", status_code=status.HTTP_201_CREATED)
-def create_prompt(
-    payload: SystemPromptCreate,
+@router.put("/system")
+def update_system_prompt(
+    payload: SystemPromptUpdate,
     admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> SystemPromptResponse:
-    """Create a new system prompt version (admin only)."""
-    author_id = admin.id
-    pt = create_system_prompt(content=payload.content, author_id=author_id)
-    return SystemPromptResponse.from_orm_obj(pt)
-
-
-@router.post("/system/{version}/activate")
-def activate_system_prompt(
-    version: int,
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
-) -> SystemPromptResponse:
-    """Activate a system prompt version (admin only)."""
-    pt = activate_prompt(version)
-    if pt is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found")
-    return SystemPromptResponse.from_orm_obj(pt)
+    """Update system prompt content (admin only)."""
+    upsert_system_prompt(content=payload.content, author_id=admin.id)
+    return SystemPromptResponse(content=payload.content)
 
 
 @router.get("/me")
 def get_my_prompt(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> UserPromptResponse | dict[str, str]:
+) -> UserPromptResponse:
     """Get the current user's personal prompt."""
-    user_id = current_user.id
-    up = get_user_prompt(user_id)
-    if up is None:
-        return {"content": "", "enabled": True}
-    return UserPromptResponse.from_orm_obj(up)
+    return UserPromptResponse(content=get_user_prompt(current_user.id))
 
 
 @router.put("/me")
@@ -73,6 +54,5 @@ def update_my_prompt(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> UserPromptResponse:
     """Update the current user's personal prompt."""
-    user_id = current_user.id
-    up = upsert_user_prompt(user_id=user_id, content=payload.content, enabled=payload.enabled)
-    return UserPromptResponse.from_orm_obj(up)
+    upsert_user_prompt(user_id=current_user.id, content=payload.content)
+    return UserPromptResponse(content=payload.content)
