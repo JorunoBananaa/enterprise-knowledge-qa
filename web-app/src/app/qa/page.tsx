@@ -93,7 +93,9 @@ export default function QAPage() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [llmConfigs, setLlmConfigs] = useState<LLMConfigBrief[]>([]);
-  const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(undefined);
+  const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(
+    undefined,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -685,7 +687,14 @@ export default function QAPage() {
         >
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
             {/* LLM selector */}
-            <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                marginBottom: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <RobotOutlined style={{ color: token.colorTextQuaternary }} />
               <Select
                 size="small"
