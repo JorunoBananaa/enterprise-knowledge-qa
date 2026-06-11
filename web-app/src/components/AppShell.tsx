@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Layout, Menu, Button, Space, Typography, App } from "antd";
@@ -19,14 +19,34 @@ import { clearToken, isLoggedIn, parseToken } from "@/lib/auth";
 const { Header, Content } = Layout;
 const { Text } = Typography;
 
+interface ShellUser {
+  username: string;
+  role: string;
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const loggedIn = isLoggedIn();
-  const user = parseToken();
+  const [authState, setAuthState] = useState<{
+    loggedIn: boolean;
+    user: ShellUser | null;
+  }>({
+    loggedIn: false,
+    user: null,
+  });
+
+  useEffect(() => {
+    setAuthState({
+      loggedIn: isLoggedIn(),
+      user: parseToken(),
+    });
+  }, [pathname]);
+
+  const { loggedIn, user } = authState;
 
   const handleLogout = () => {
     clearToken();
+    setAuthState({ loggedIn: false, user: null });
     router.push("/login");
   };
 
