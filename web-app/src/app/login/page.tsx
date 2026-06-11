@@ -27,7 +27,7 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
       setToken(data.access_token);
-      router.push("/library");
+      router.push("/qa");
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
     } finally {

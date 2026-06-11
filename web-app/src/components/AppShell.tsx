@@ -57,21 +57,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith("/prompts")) return "/prompts";
     if (pathname.startsWith("/llm-configs")) return "/llm-configs";
     if (pathname.startsWith("/users")) return "/users";
-    return "/library";
+    return "/qa";
   }, [pathname]);
 
   const menuItems = useMemo(() => {
     const items: any[] = [
       // ── 业务操作 ──
       {
+        key: "/qa",
+        icon: <QuestionCircleOutlined />,
+        label: (
+          <Link
+            href="/qa"
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            企业知识问答
+          </Link>
+        ),
+      },
+      {
         key: "/library",
         icon: <BookOutlined />,
         label: <Link href="/library">知识库</Link>,
-      },
-      {
-        key: "/qa",
-        icon: <QuestionCircleOutlined />,
-        label: <Link href="/qa">智能问答</Link>,
       },
       {
         key: "/prompts",
@@ -119,21 +130,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           justifyContent: "space-between",
           padding: "0 24px",
           background: "#001529",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
-          <Link
-            href="/library"
-            style={{
-              color: "#fff",
-              fontSize: 18,
-              fontWeight: 700,
-              marginRight: 32,
-              whiteSpace: "nowrap",
-            }}
-          >
-            企业知识问答
-          </Link>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flex: 1,
+          }}
+        >
           <Menu
             theme="dark"
             mode="horizontal"
