@@ -19,7 +19,10 @@ interface Document {
 
 export default function ReviewPage() {
   const { message } = App.useApp();
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<{
+    docId: number;
+    action: "approve" | "reject";
+  } | null>(null);
 
   const {
     data: docsData,
@@ -33,9 +36,6 @@ export default function ReviewPage() {
     {
       method: "POST",
       manual: true,
-      onBefore: () => {
-        // setActionLoadingId is set before calling run
-      },
       onSuccess: () => {
         message.success("文档已通过审核并完成索引");
         fetchDocs();
@@ -44,7 +44,7 @@ export default function ReviewPage() {
         message.error(err instanceof Error ? err.message : "审核通过操作失败");
       },
       onFinally: () => {
-        setActionLoadingId(null);
+        setActionLoading(null);
       },
     },
   );
@@ -62,18 +62,18 @@ export default function ReviewPage() {
         message.error(err instanceof Error ? err.message : "驳回操作失败");
       },
       onFinally: () => {
-        setActionLoadingId(null);
+        setActionLoading(null);
       },
     },
   );
 
   const doApprove = (id: number) => {
-    setActionLoadingId(id);
+    setActionLoading({ docId: id, action: "approve" });
     handleApprove(id);
   };
 
   const doReject = (id: number) => {
-    setActionLoadingId(id);
+    setActionLoading({ docId: id, action: "reject" });
     handleReject(id);
   };
 
@@ -105,7 +105,14 @@ export default function ReviewPage() {
                     <Button
                       type="primary"
                       icon={<CheckOutlined />}
-                      loading={actionLoadingId === doc.id}
+                      loading={
+                        actionLoading?.docId === doc.id &&
+                        actionLoading?.action === "approve"
+                      }
+                      disabled={
+                        actionLoading?.docId === doc.id &&
+                        actionLoading?.action === "reject"
+                      }
                       onClick={() => doApprove(doc.id)}
                     >
                       通过
@@ -113,7 +120,14 @@ export default function ReviewPage() {
                     <Button
                       danger
                       icon={<CloseOutlined />}
-                      loading={actionLoadingId === doc.id}
+                      loading={
+                        actionLoading?.docId === doc.id &&
+                        actionLoading?.action === "reject"
+                      }
+                      disabled={
+                        actionLoading?.docId === doc.id &&
+                        actionLoading?.action === "approve"
+                      }
                       onClick={() => doReject(doc.id)}
                     >
                       驳回
