@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -23,6 +23,7 @@ import {
   StopOutlined,
   CheckOutlined,
   TeamOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { apiFetch } from "@/lib/api";
 
@@ -63,7 +64,7 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
   const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
 
   // ── modals ──
@@ -78,20 +79,18 @@ export default function UsersPage() {
   const [editForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
 
-  // ── debounce search ───────────────────────────────────────────
+  // ── manual search ───────────────────────────────────────────
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearch = () => {
+    setSubmittedSearch(search);
+    setPagination((p) => ({ ...p, offset: 0 }));
+  };
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPagination((p) => ({ ...p, offset: 0 }));
-    }, 500);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [search]);
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -100,7 +99,7 @@ export default function UsersPage() {
         offset: String(pagination.offset),
         limit: String(pagination.limit),
       });
-      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (submittedSearch.trim()) params.set("search", submittedSearch.trim());
       const res = await apiFetch<UserListResponse>(
         `/users?${params.toString()}`,
       );
@@ -111,7 +110,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, debouncedSearch, message]);
+  }, [pagination, submittedSearch, message]);
 
   useEffect(() => {
     fetchUsers();
@@ -326,13 +325,23 @@ export default function UsersPage() {
       </div>
 
       <Card className="!mb-4">
-        <Input
-          placeholder="搜索用户名或显示名称"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 300 }}
-          allowClear
-        />
+        <Space>
+          <Input
+            placeholder="搜索用户名或显示名称"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            style={{ width: 300 }}
+            allowClear
+          />
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={handleSearch}
+          >
+            搜索
+          </Button>
+        </Space>
       </Card>
 
       <Table
