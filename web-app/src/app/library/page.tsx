@@ -141,6 +141,7 @@ export default function LibraryPage() {
           dataSource={docs}
           rowKey="id"
           loading={loading}
+          rowClassName="cursor-pointer transition-colors"
           pagination={{
             total,
             pageSize: 20,

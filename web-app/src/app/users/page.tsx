@@ -359,6 +359,7 @@ export default function UsersPage() {
         dataSource={listData.items}
         rowKey="id"
         loading={loading}
+        rowClassName="cursor-pointer transition-colors"
         pagination={{
           current: Math.floor(pagination.offset / pagination.limit) + 1,
           pageSize: pagination.limit,

@@ -39,6 +39,11 @@ export default function RootLayout({
                 controlItemBgActive: "#f4f4f5",
                 controlItemBgHover: "#f8fafc",
               },
+              components: {
+                Table: {
+                  rowHoverBg: "#f4f6f9",
+                },
+              },
             }}
           >
             <AppShell>{children}</AppShell>

@@ -91,6 +91,30 @@ textarea.ant-input:not(.ant-input-disabled),
   border-color: #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  transition:
+    box-shadow 0.4s ease,
+    transform 0.4s ease,
+    border-color 0.4s ease;
+}
+
+.ant-card:not(.ant-card-no-hover):hover {
+  box-shadow:
+    0 10px 24px rgb(15 23 42 / 0.07),
+    0 4px 8px rgb(15 23 42 / 0.04);
+  border-color: #d1d5db;
+}
+
+/* 卡片抬起效果 — 给需要明显交互感的卡片使用 */
+.card-lift {
+  transition:
+    box-shadow 0.5s ease,
+    transform 0.5s ease;
+}
+.card-lift:hover {
+  box-shadow:
+    0 14px 32px rgb(15 23 42 / 0.09),
+    0 6px 12px rgb(15 23 42 / 0.05);
+  transform: translateY(-2px);
 }
 
 .ant-card .ant-card-head {

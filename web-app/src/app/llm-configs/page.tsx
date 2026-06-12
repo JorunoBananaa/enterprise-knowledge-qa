@@ -466,7 +466,7 @@ export default function LLMConfigPage() {
       {/* ── 统计卡片 ── */}
       <Row gutter={16}>
         <Col xs={12} sm={8}>
-          <Card size="small" className="!rounded-xl">
+          <Card size="small" className="!rounded-xl" style={{ height: "100%" }}>
             <Statistic
               title="配置总数"
               value={configs.length}
@@ -475,7 +475,7 @@ export default function LLMConfigPage() {
           </Card>
         </Col>
         <Col xs={12} sm={8}>
-          <Card size="small" className="!rounded-xl">
+          <Card size="small" className="!rounded-xl" style={{ height: "100%" }}>
             <Statistic
               title="供应商数"
               value={new Set(configs.map((c) => c.provider)).size}
@@ -487,6 +487,7 @@ export default function LLMConfigPage() {
           <Card
             size="small"
             className={`!rounded-xl ${activeConfig ? "!border-blue-300 !bg-blue-50/50" : ""}`}
+            style={{ height: "100%" }}
           >
             <Statistic
               title="默认模型"
@@ -506,40 +507,35 @@ export default function LLMConfigPage() {
       </Row>
 
       {/* ── 配置表格 ── */}
-      <Card
-        className="!rounded-xl !shadow-sm"
-        styles={{ body: { padding: 0 } }}
-      >
-        <Table
-          dataSource={configs}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          pagination={false}
-          tableLayout="fixed"
-          scroll={{ x: 960 }}
-          rowClassName={(record) => (record.is_active ? "bg-blue-50/30" : "")}
-          locale={{
-            emptyText: (
-              <div className="py-16 space-y-3">
-                <RobotOutlined className="!text-5xl !text-gray-300" />
-                <div>
-                  <Text type="secondary" className="text-base">
-                    暂未添加任何大模型配置
-                  </Text>
-                </div>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={openCreate}
-                >
-                  立即添加
-                </Button>
+      <Table
+        dataSource={configs}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        pagination={false}
+        tableLayout="fixed"
+        scroll={{ x: 960 }}
+        rowClassName={(record) => (record.is_active ? "bg-blue-50/30" : "")}
+        locale={{
+          emptyText: (
+            <div className="py-16 space-y-3">
+              <RobotOutlined className="!text-5xl !text-gray-300" />
+              <div>
+                <Text type="secondary" className="text-base">
+                  暂未添加任何大模型配置
+                </Text>
               </div>
-            ),
-          }}
-        />
-      </Card>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={openCreate}
+              >
+                立即添加
+              </Button>
+            </div>
+          ),
+        }}
+      />
 
       {/* ── 创建 / 编辑弹窗 ── */}
       <Modal

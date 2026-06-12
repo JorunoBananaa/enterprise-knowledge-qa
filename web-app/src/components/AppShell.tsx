@@ -236,7 +236,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           <Link
             href="/qa"
-            className="flex items-center gap-[9px] h-7 mt-[18px] mb-4 rounded-md bg-app-primary px-3 text-white text-sm font-bold cursor-pointer hover:bg-[#262626] hover:text-white"
+            className="flex items-center gap-[9px] h-7 mt-[18px] mb-4 rounded-md bg-app-primary px-3 text-white text-sm font-bold cursor-pointer transition-colors duration-200 ease-out hover:bg-[#262626] hover:text-white"
           >
             <PlusSquareOutlined />
             <span>新建问答</span>
@@ -250,7 +250,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.key}
                   href={item.href}
-                  className={`flex items-center gap-2.5 min-h-[38px] rounded-[7px] px-[11px] text-[#575f6c] text-sm font-medium cursor-pointer hover:text-app-primary hover:bg-[#efeff0] ${
+                  className={`flex items-center gap-2.5 min-h-[38px] rounded-[7px] px-[11px] text-[#575f6c] text-sm font-medium cursor-pointer transition-colors duration-200 ease-out hover:text-app-primary hover:bg-[#efeff0] ${
                     active ? "text-app-primary bg-[#efeff0]" : ""
                   }`}
                 >
@@ -389,7 +389,7 @@ function SessionHistoryBlock({
         return (
           <div
             key={session.id}
-            className={`group flex items-center gap-1 min-w-0 min-h-[38px] rounded-lg py-1.5 pl-[11px] pr-[5px] text-app-text cursor-pointer hover:bg-[#efeff0] ${
+            className={`group flex items-center gap-1 min-w-0 min-h-[38px] rounded-lg py-1.5 pl-[11px] pr-[5px] text-app-text cursor-pointer transition-colors duration-200 ease-out hover:bg-[#efeff0] ${
               active ? "bg-[#efeff0]" : ""
             }`}
           >

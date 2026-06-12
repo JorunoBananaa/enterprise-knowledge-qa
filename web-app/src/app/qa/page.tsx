@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Button,
   Card,
   Select,
   Skeleton,
@@ -20,7 +21,7 @@ import {
   message,
   theme,
 } from "antd";
-import { RobotOutlined, UserOutlined } from "@ant-design/icons";
+import { CopyOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
@@ -260,6 +261,14 @@ function QAPageContent() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // ── copy answer to clipboard ────────────────────────────────────
+  const handleCopyAnswer = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => message.success("已复制到剪贴板"),
+      () => message.error("复制失败"),
+    );
+  }, []);
+
   // ── derived state ────────────────────────────────────────────────
 
   const sessionMap = useMemo(
@@ -351,8 +360,8 @@ function QAPageContent() {
               </Text>
             </div>
           ) : (
-            <div className="w-full max-w-[680px] mx-auto cursor-default">
-              <Space direction="vertical" size={20} style={{ width: "100%" }}>
+            <div className="w-full max-w-[784px] mx-auto px-10 sm:px-12 cursor-default">
+              <Space direction="vertical" size={28} style={{ width: "100%" }}>
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
@@ -361,117 +370,66 @@ function QAPageContent() {
                     }}
                   >
                     {/* User question bubble */}
-                    <Card
-                      size="small"
-                      className="max-w-[min(82%,640px)] shadow-none ml-auto !border-app-primary !bg-app-primary [&_.ant-typography]:!text-white"
-                      styles={{
-                        body: { padding: "14px 18px" },
-                      }}
-                      style={{
-                        borderRadius: `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px ${token.borderRadiusLG}px`,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 10,
-                        }}
-                      >
-                        <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-white/20 text-white">
-                          <UserOutlined
-                            style={{ color: "#fff", fontSize: 14 }}
-                          />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text
-                            strong
-                            style={{
-                              color: token.colorPrimary,
-                              fontSize: 12,
-                              marginBottom: 6,
-                              display: "block",
-                            }}
-                          >
-                            你
-                          </Text>
+                    <div className="relative flex justify-end">
+                      <div className="group w-fit max-w-[75%]">
+                        <Card
+                          size="small"
+                          className="shadow-none !border-app-primary !bg-app-primary [&_.ant-typography]:!text-white"
+                          styles={{
+                            body: { padding: "14px 18px" },
+                          }}
+                          style={{
+                            borderRadius: `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px ${token.borderRadiusLG}px`,
+                          }}
+                        >
                           <Paragraph
                             style={{
                               marginBottom: 0,
                               whiteSpace: "pre-wrap",
-                              color: token.colorText,
-                              lineHeight: 1.7,
+                              lineHeight: 1.75,
                             }}
                           >
                             {msg.question}
                           </Paragraph>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* AI answer card */}
-                    <Card
-                      size="small"
-                      className="max-w-[min(82%,640px)] shadow-none !border-app-border !bg-white"
-                      styles={{
-                        body: { padding: "14px 18px" },
-                      }}
-                      style={{
-                        marginTop: 12,
-                        borderRadius: `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px`,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 10,
-                        }}
-                      >
-                        <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary-soft text-app-primary">
-                          <RobotOutlined
-                            style={{ color: token.colorPrimary, fontSize: 14 }}
+                        </Card>
+                        <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={() => handleCopyAnswer(msg.question)}
+                            style={{
+                              color: token.colorTextTertiary,
+                            }}
                           />
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              marginBottom: 6,
-                            }}
-                          >
-                            <Text
-                              strong
-                              style={{
-                                color: token.colorPrimary,
-                                fontSize: 12,
-                              }}
-                            >
-                              AI 助手
-                            </Text>
-                            <Tag
-                              color={
-                                msg.result_status === "answered"
-                                  ? "success"
-                                  : msg.result_status === "streaming"
-                                    ? "processing"
-                                    : "warning"
-                              }
-                              style={{
-                                fontSize: 11,
-                                lineHeight: "18px",
-                                borderRadius: token.borderRadiusSM,
-                              }}
-                            >
-                              {msg.result_status === "answered"
-                                ? "已作答"
-                                : msg.result_status === "streaming"
-                                  ? "生成中…"
-                                  : "证据不足"}
-                            </Tag>
-                          </div>
+                      </div>
+                      <div className="absolute -right-[42px] top-0 flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary text-white">
+                        <UserOutlined style={{ color: "#fff", fontSize: 14 }} />
+                      </div>
+                    </div>
+
+                    {/* AI answer card */}
+                    <div className="relative mt-3">
+                      <div className="absolute -left-[42px] top-0 flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary-soft text-app-primary">
+                        <RobotOutlined
+                          style={{
+                            color: token.colorPrimary,
+                            fontSize: 14,
+                          }}
+                        />
+                      </div>
+                      <div className="group min-w-0">
+                        <Card
+                          size="small"
+                          className="w-full shadow-none !border-app-border !bg-white"
+                          styles={{
+                            body: { padding: "14px 18px" },
+                          }}
+                          style={{
+                            borderRadius: `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px`,
+                          }}
+                        >
                           <Paragraph
                             style={{
                               marginBottom: 0,
@@ -482,9 +440,20 @@ function QAPageContent() {
                           >
                             {msg.answer}
                           </Paragraph>
+                        </Card>
+                        <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={() => handleCopyAnswer(msg.answer)}
+                            style={{
+                              color: token.colorTextTertiary,
+                            }}
+                          />
                         </div>
                       </div>
-                    </Card>
+                    </div>
                   </div>
                 ))}
                 <div ref={bottomRef} />
