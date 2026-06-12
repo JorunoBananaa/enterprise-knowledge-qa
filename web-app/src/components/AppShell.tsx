@@ -206,14 +206,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!userFirstLoadDone.current) {
     return (
-      <Layout
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <Layout className="flex min-h-screen items-center justify-center">
         <Spin size="large" />
       </Layout>
     );
@@ -224,25 +217,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Layout className="app-shell">
-      <aside className="app-sidebar">
-        <div className="app-sidebar-top">
-          <div className="app-shell-brand">
-            <span className="app-shell-brand-icon">
+    <Layout className="flex flex-row min-h-screen bg-white">
+      <aside className="sticky top-0 flex w-sidebar shrink-0 flex-col justify-between h-screen border-r border-app-border bg-[#f7f7f8] px-[13px] py-[18px] pb-[14px]">
+        <div className="min-h-0">
+          <div className="flex shrink-0 items-center gap-2.5 min-w-0 text-app-text cursor-default px-1">
+            <span className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-app bg-app-primary text-white shadow-[0_8px_18px_rgb(23_23_23_/_0.12)]">
               <BookOutlined />
             </span>
-            <span className="app-shell-brand-copy">
-              <span className="app-shell-brand-title">知识中枢</span>
-              <span className="app-shell-brand-subtitle">企业知识库助手</span>
+            <span className="grid">
+              <span className="block leading-[18px] text-sm font-bold">
+                知识中枢
+              </span>
+              <span className="block leading-4 text-xs text-app-muted">
+                企业知识库助手
+              </span>
             </span>
           </div>
 
-          <Link href="/qa" className="app-sidebar-new">
+          <Link
+            href="/qa"
+            className="flex items-center gap-[9px] h-7 mt-[18px] mb-4 rounded-md bg-app-primary px-3 text-white text-sm font-bold cursor-pointer hover:bg-[#262626] hover:text-white"
+          >
             <PlusSquareOutlined />
             <span>新建问答</span>
           </Link>
 
-          <nav className="app-sidebar-nav" aria-label="主导航">
+          <nav className="grid gap-0.5 mb-[22px]" aria-label="主导航">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = selectedKey === item.key;
@@ -250,8 +250,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.key}
                   href={item.href}
-                  className={`app-sidebar-nav-item ${
-                    active ? "app-sidebar-nav-item-active" : ""
+                  className={`flex items-center gap-2.5 min-h-[38px] rounded-[7px] px-[11px] text-[#575f6c] text-sm font-medium cursor-pointer hover:text-app-primary hover:bg-[#efeff0] ${
+                    active ? "text-app-primary bg-[#efeff0]" : ""
                   }`}
                 >
                   <Icon />
@@ -261,14 +261,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="app-sidebar-history">
-            <div className="app-sidebar-section-title">
+          <div className="min-h-0">
+            <div className="flex items-center justify-between px-[7px] pb-2.5 text-[#7b8492] text-xs font-semibold">
               <span>历史会话</span>
             </div>
             <Suspense
               fallback={
                 <div
-                  className="app-sidebar-session-list"
+                  className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
                   style={{ padding: "0 8px" }}
                 >
                   {[1, 2, 3, 4].map((i) => (
@@ -293,15 +293,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="app-sidebar-user">
-          <span className="app-sidebar-avatar">
+        <div className="flex items-center gap-2.5 border-t border-app-border pt-[14px]">
+          <span className="inline-flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-white text-app-primary text-[13px] font-extrabold">
             {(user.display_name || user.username).slice(0, 1).toUpperCase()}
           </span>
-          <span className="app-sidebar-user-copy">
-            <Text ellipsis className="app-sidebar-user-name">
+          <span className="grid flex-1 min-w-0">
+            <Text ellipsis className="text-app-text text-[13px] font-bold">
               {user.display_name || user.username}
             </Text>
-            <span className="app-sidebar-user-role">
+            <span className="text-app-muted text-xs">
               {user.role === "admin" ? "管理员" : "知识库成员"}
             </span>
           </span>
@@ -315,13 +315,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <Content
-        className={`app-shell-content ${
-          isQaPage ? "app-shell-content-qa" : ""
+        className={`flex-1 min-w-0 w-full min-h-screen bg-app-bg px-8 py-7 ${
+          isQaPage ? "!p-0" : ""
         }`}
       >
         {/* Route transition progress bar */}
         <div
-          className={`app-nav-progress ${navigating ? "app-nav-progress-active" : ""}`}
+          className={`fixed top-0 left-0 z-[9999] h-[3px] w-0 bg-gradient-to-r from-[#171717] to-[#525252] rounded-r-[3px] opacity-0 transition-opacity duration-200 ease pointer-events-none ${
+            navigating ? "opacity-100 animate-nav-progress-slide" : ""
+          }`}
         />
         <App>{children}</App>
       </Content>
@@ -357,7 +359,10 @@ function SessionHistoryBlock({
 
   if (loading) {
     return (
-      <div className="app-sidebar-session-list" style={{ padding: "0 8px" }}>
+      <div
+        className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
+        style={{ padding: "0 8px" }}
+      >
         {[1, 2, 3, 4].map((i) => (
           <Skeleton
             key={i}
@@ -372,25 +377,27 @@ function SessionHistoryBlock({
   }
 
   if (sessions.length === 0) {
-    return <div className="app-sidebar-empty">暂无历史会话</div>;
+    return (
+      <div className="px-2 py-2.5 text-app-muted text-[13px]">暂无历史会话</div>
+    );
   }
 
   return (
-    <div className="app-sidebar-session-list">
+    <div className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5">
       {sessions.map((session) => {
         const active = currentSessionId === String(session.id);
         return (
           <div
             key={session.id}
-            className={`app-sidebar-session ${
-              active ? "app-sidebar-session-active" : ""
+            className={`group flex items-center gap-1 min-w-0 min-h-[38px] rounded-lg py-1.5 pl-[11px] pr-[5px] text-app-text cursor-pointer hover:bg-[#efeff0] ${
+              active ? "bg-[#efeff0]" : ""
             }`}
           >
             <div
               onClick={() => router.push(`/qa?session_id=${session.id}`)}
-              className="app-sidebar-session-link"
+              className="flex-1 min-w-0 text-inherit cursor-pointer"
             >
-              <span className="app-sidebar-session-title">
+              <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold">
                 {session.title || "新会话"}
               </span>
             </div>
@@ -407,7 +414,7 @@ function SessionHistoryBlock({
             >
               <button
                 type="button"
-                className="app-sidebar-session-delete"
+                className="invisible opacity-0 inline-flex items-center justify-center shrink-0 w-7 h-7 border-0 rounded-md bg-transparent text-app-muted cursor-pointer p-0 transition-[opacity,visibility] duration-150 hover:bg-black/5 hover:text-app-danger group-hover:visible group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
                 aria-label="删除会话"
               >

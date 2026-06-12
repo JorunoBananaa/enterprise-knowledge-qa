@@ -42,16 +42,18 @@ function LoginForm() {
     : "";
 
   return (
-    <div className="login-page">
+    <div className="min-h-screen flex flex-col bg-app-bg">
       {/* Brand header */}
-      <header className="login-header">
-        <div className="login-brand">
-          <span className="login-brand-icon">
+      <header className="flex items-center h-14 px-6 border-b border-app-border bg-white">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-app bg-app-primary text-white text-base shadow-[0_8px_18px_rgb(23_23_23_/_0.12)]">
             <BookOutlined />
           </span>
           <div>
-            <span className="login-brand-title">企业知识问答</span>
-            <span className="login-brand-subtitle">
+            <span className="block leading-[18px] text-sm font-bold text-app-text">
+              企业知识问答
+            </span>
+            <span className="block leading-4 text-[11px] text-app-muted">
               Enterprise Knowledge QA
             </span>
           </div>
@@ -59,9 +61,12 @@ function LoginForm() {
       </header>
 
       {/* Login card */}
-      <main className="login-main">
-        <Card className="login-card" styles={{ body: { padding: 40 } }}>
-          <div className="login-card-header">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-10">
+        <Card
+          className="!w-[400px] !max-w-full !border-app-border !rounded-app !shadow-app-raised [&_input:-webkit-autofill]:![shadow:0_0_0_1000px_#fff_inset] [&_input:-webkit-autofill]:![text-fill-color:rgba(0,0,0,0.88)] [&_input:-webkit-autofill]:![transition:background-color_5000s_ease-in-out_0s]"
+          styles={{ body: { padding: 40 } }}
+        >
+          <div className="text-center mb-8">
             <Title level={3} style={{ marginBottom: 4 }}>
               欢迎回来
             </Title>
@@ -89,7 +94,7 @@ function LoginForm() {
               rules={[{ required: true, message: "请输入用户名" }]}
             >
               <Input
-                prefix={<UserOutlined className="login-input-icon" />}
+                prefix={<UserOutlined className="text-app-muted" />}
                 placeholder="请输入用户名"
               />
             </Form.Item>
@@ -99,7 +104,7 @@ function LoginForm() {
               rules={[{ required: true, message: "请输入密码" }]}
             >
               <Input.Password
-                prefix={<LockOutlined className="login-input-icon" />}
+                prefix={<LockOutlined className="text-app-muted" />}
                 placeholder="请输入密码"
               />
             </Form.Item>
@@ -118,109 +123,10 @@ function LoginForm() {
           </Form>
         </Card>
 
-        <Text type="secondary" className="login-footer-text">
+        <Text type="secondary" className="mt-6 text-xs">
           企业级知识库智能问答平台
         </Text>
       </main>
-
-      <style jsx global>{`
-        /* ── Login page layout ── */
-        .login-page {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          background: var(--app-bg);
-        }
-
-        /* ── Header ── */
-        .login-header {
-          display: flex;
-          align-items: center;
-          height: 56px;
-          padding: 0 24px;
-          border-bottom: 1px solid var(--app-border);
-          background: var(--app-surface);
-        }
-
-        .login-brand {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .login-brand-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 34px;
-          height: 34px;
-          border-radius: var(--app-radius);
-          background: var(--app-primary);
-          color: #fff;
-          font-size: 16px;
-          box-shadow: 0 8px 18px rgb(23 23 23 / 0.12);
-        }
-
-        .login-brand-title {
-          display: block;
-          line-height: 18px;
-          font-size: 14px;
-          font-weight: 700;
-          color: var(--app-text);
-        }
-
-        .login-brand-subtitle {
-          display: block;
-          line-height: 16px;
-          font-size: 11px;
-          color: var(--app-muted);
-        }
-
-        /* ── Main content ── */
-        .login-main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 40px 24px;
-        }
-
-        /* ── Card ── */
-        .login-card {
-          width: 400px;
-          max-width: 100%;
-          border: 1px solid var(--app-border);
-          border-radius: var(--app-radius);
-          box-shadow: var(--app-shadow-raised);
-        }
-
-        .login-card-header {
-          text-align: center;
-          margin-bottom: 32px;
-        }
-
-        /* ── Input icons ── */
-        .login-input-icon {
-          color: var(--app-muted);
-        }
-
-        /* ── Autofill override ── */
-        .login-card input:-webkit-autofill,
-        .login-card input:-webkit-autofill:hover,
-        .login-card input:-webkit-autofill:focus,
-        .login-card input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
-          -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
-          transition: background-color 5000s ease-in-out 0s;
-        }
-
-        /* ── Footer text ── */
-        .login-footer-text {
-          margin-top: 24px;
-          font-size: 12px;
-        }
-      `}</style>
     </div>
   );
 }

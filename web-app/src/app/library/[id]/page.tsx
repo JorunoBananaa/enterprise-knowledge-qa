@@ -50,13 +50,15 @@ export default function DocumentDetailPage() {
         返回知识库
       </Link>
 
-      <div className="page-header">
+      <div className="flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <div className="page-eyebrow">DOCUMENT DETAIL</div>
+          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
+            DOCUMENT DETAIL
+          </div>
           <Title level={3} className="!mb-1">
             {doc.title}
           </Title>
-          <p className="page-description !mb-0">
+          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
             {doc.file_type} · 上传者 #{doc.uploader_id}
           </p>
         </div>

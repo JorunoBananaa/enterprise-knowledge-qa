@@ -80,7 +80,7 @@ export default function QAPage() {
   return (
     <Suspense
       fallback={
-        <div className="qa-shell">
+        <div className="flex flex-col overflow-hidden h-screen border-0 rounded-none bg-app-bg shadow-none px-8 py-7 box-border">
           <div className="flex h-full min-h-[420px] items-center justify-center">
             <Spin size="large" />
           </div>
@@ -274,28 +274,37 @@ function QAPageContent() {
   // ── render ───────────────────────────────────────────────────────
 
   return (
-    <div className="qa-shell">
-      <div className="qa-main" style={{ flex: 1 }}>
+    <div className="flex flex-col overflow-hidden h-screen border-0 rounded-none bg-app-bg shadow-none px-8 py-7 box-border">
+      <div
+        className="flex flex-col overflow-hidden border border-app-border rounded-app bg-white shadow-app"
+        style={{ flex: 1 }}
+      >
         {/* Top bar */}
-        <div className="qa-chat-header">
-          <div className="qa-chat-title">
-            <Text ellipsis className="qa-chat-title-main">
+        <div className="flex items-center gap-3 border-b border-app-border-soft bg-white px-6 py-[17px]">
+          <div className="flex min-w-0 flex-1 flex-col leading-[1.35]">
+            <Text ellipsis className="text-[15px] font-bold text-app-text">
               {activeSessionTitle}
             </Text>
-            <span className="qa-chat-title-sub">
+            <span className="text-app-muted text-xs">
               基于企业内部知识库的检索增强问答
             </span>
           </div>
-          <Tag className="qa-ready-tag">
+          <Tag className="inline-flex items-center gap-1.5 m-0 border-0 rounded-full bg-[#f4f4f5] text-app-text text-xs font-bold">
             <RobotOutlined />
             知识库已就绪
           </Tag>
         </div>
 
         {/* Messages area */}
-        <div ref={messagesContainerRef} className="qa-messages">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-auto bg-white px-6 py-[34px] pb-7 cursor-default"
+        >
           {messagesLoading ? (
-            <div className="qa-message-stack" style={{ padding: "24px 32px" }}>
+            <div
+              className="w-full max-w-[680px] mx-auto cursor-default"
+              style={{ padding: "24px 32px" }}
+            >
               <Space direction="vertical" size={20} style={{ width: "100%" }}>
                 {[1, 2, 3].map((i) => (
                   <div key={i}>
@@ -317,8 +326,8 @@ function QAPageContent() {
               </Space>
             </div>
           ) : messages.length === 0 ? (
-            <div className="qa-empty">
-              <div className="qa-empty-icon">
+            <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 text-center">
+              <div className="flex items-center justify-center w-14 h-14 rounded-app bg-app-primary text-white shadow-[0_10px_22px_rgb(23_23_23_/_0.12)]">
                 <RobotOutlined
                   style={{
                     fontSize: 28,
@@ -342,7 +351,7 @@ function QAPageContent() {
               </Text>
             </div>
           ) : (
-            <div className="qa-message-stack">
+            <div className="w-full max-w-[680px] mx-auto cursor-default">
               <Space direction="vertical" size={20} style={{ width: "100%" }}>
                 {messages.map((msg) => (
                   <div
@@ -354,7 +363,7 @@ function QAPageContent() {
                     {/* User question bubble */}
                     <Card
                       size="small"
-                      className="qa-message-card qa-message-card-user"
+                      className="max-w-[min(82%,640px)] shadow-none ml-auto !border-app-primary !bg-app-primary [&_.ant-typography]:!text-white"
                       styles={{
                         body: { padding: "14px 18px" },
                       }}
@@ -369,7 +378,7 @@ function QAPageContent() {
                           gap: 10,
                         }}
                       >
-                        <div className="qa-avatar qa-avatar-user">
+                        <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-white/20 text-white">
                           <UserOutlined
                             style={{ color: "#fff", fontSize: 14 }}
                           />
@@ -403,7 +412,7 @@ function QAPageContent() {
                     {/* AI answer card */}
                     <Card
                       size="small"
-                      className="qa-message-card qa-message-card-assistant"
+                      className="max-w-[min(82%,640px)] shadow-none !border-app-border !bg-white"
                       styles={{
                         body: { padding: "14px 18px" },
                       }}
@@ -419,7 +428,7 @@ function QAPageContent() {
                           gap: 10,
                         }}
                       >
-                        <div className="qa-avatar qa-avatar-assistant">
+                        <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary-soft text-app-primary">
                           <RobotOutlined
                             style={{ color: token.colorPrimary, fontSize: 14 }}
                           />
@@ -485,10 +494,10 @@ function QAPageContent() {
         </div>
 
         {/* Input area — sticky bottom */}
-        <div className="qa-input-bar">
-          <div className="qa-input-inner">
+        <div className="border-t border-app-border-soft bg-white px-6 py-[14px] pb-4">
+          <div className="w-full max-w-[768px] mx-auto">
             {/* LLM selector */}
-            <div className="qa-model-row">
+            <div className="flex items-center gap-2 mb-2 text-app-muted cursor-default">
               <RobotOutlined style={{ color: token.colorTextQuaternary }} />
               <Select
                 size="small"

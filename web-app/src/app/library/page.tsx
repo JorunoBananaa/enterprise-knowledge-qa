@@ -93,14 +93,16 @@ export default function LibraryPage() {
 
   return (
     <div className="max-w-[1060px] mx-auto">
-      <div className="page-header">
+      <div className="flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <div className="page-eyebrow">KNOWLEDGE BASE</div>
+          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
+            KNOWLEDGE BASE
+          </div>
           <Title level={3} className="!mb-1">
             <BookOutlined className="mr-2 text-zinc-700" />
             知识库
           </Title>
-          <p className="page-description !mb-0">
+          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
             管理企业知识文档，上传后经审核即可加入检索索引
           </p>
         </div>

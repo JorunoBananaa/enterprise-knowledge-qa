@@ -446,14 +446,16 @@ export default function LLMConfigPage() {
   return (
     <div className="max-w-[1060px] mx-auto space-y-5">
       {/* ── 页头 ── */}
-      <div className="page-header">
+      <div className="flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <div className="page-eyebrow">LLM CONFIGS</div>
+          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
+            LLM CONFIGS
+          </div>
           <Title level={3} className="!mb-1">
             <RobotOutlined className="mr-2 text-zinc-700" />
             大模型管理
           </Title>
-          <p className="page-description !mb-0">
+          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
             管理 DeepSeek、OpenAI 等大模型供应商的 API 配置，支持多配置切换
           </p>
         </div>

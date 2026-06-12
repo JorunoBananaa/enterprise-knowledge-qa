@@ -44,13 +44,13 @@ function SystemPromptPanel() {
 
   return (
     <div>
-      <div className="prompt-panel-intro">
+      <div className="mb-[14px] border-l-[3px] border-app-primary rounded-r-app bg-app-primary-soft px-[14px] py-3">
         <Paragraph type="secondary" className="!mb-0">
           系统提示词定义了回答的基础规则，对所有问答生效。
         </Paragraph>
       </div>
 
-      <Card className="prompt-editor-card">
+      <Card className="[&_.ant-card-body]:!p-5 [&_textarea.ant-input]:!min-h-[220px] [&_textarea.ant-input]:!leading-[1.75]">
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Form.Item name="content" label="提示词内容">
             <TextArea rows={8} placeholder="请输入系统提示词内容，可为空..." />
@@ -98,13 +98,13 @@ function PersonalPromptPanel() {
 
   return (
     <div>
-      <div className="prompt-panel-intro">
+      <div className="mb-[14px] border-l-[3px] border-app-primary rounded-r-app bg-app-primary-soft px-[14px] py-3">
         <Paragraph type="secondary" className="!mb-0">
           自定义回答的风格和格式，仅对你本人可见。
         </Paragraph>
       </div>
 
-      <Card className="prompt-editor-card">
+      <Card className="[&_.ant-card-body]:!p-5 [&_textarea.ant-input]:!min-h-[220px] [&_textarea.ant-input]:!leading-[1.75]">
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Form.Item name="content" label="提示词内容">
             <TextArea
@@ -175,15 +175,20 @@ export default function PromptsPage() {
   }
 
   return (
-    <div className="prompt-page">
-      <div className="page-header">
+    <div className="w-full max-w-[1060px] mx-auto">
+      <div className="flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <div className="page-eyebrow">PROMPTS</div>
+          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
+            PROMPTS
+          </div>
           <Title level={3} className="!mb-1">
             <FileTextOutlined className="mr-2 text-zinc-700" />
             提示词管理
           </Title>
-          <Paragraph type="secondary" className="!mb-0 page-description">
+          <Paragraph
+            type="secondary"
+            className="!mb-0 text-app-muted text-sm leading-[1.7]"
+          >
             {isAdmin
               ? "管理系统全局提示词与个人自定义提示词"
               : "自定义问答风格，让你的回答更符合个人偏好"}
@@ -192,7 +197,7 @@ export default function PromptsPage() {
       </div>
 
       <Tabs
-        className="prompt-tabs"
+        className="[&_.ant-tabs-nav]:!mb-4 [&_.ant-tabs-tab]:!py-[9px] [&_.ant-tabs-tab]:!px-[13px]"
         defaultActiveKey={isAdmin ? "system" : "personal"}
         items={tabItems}
         size="large"

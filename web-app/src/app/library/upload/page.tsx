@@ -73,13 +73,15 @@ export default function UploadPage() {
         返回知识库
       </Link>
 
-      <div className="page-header">
+      <div className="flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <div className="page-eyebrow">UPLOAD</div>
+          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
+            UPLOAD
+          </div>
           <Title level={3} className="!mb-1">
             上传文档
           </Title>
-          <p className="page-description !mb-0">
+          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
             上传 PDF、Word、PPT、Excel 文件到知识库，提交后将进入审核流程
           </p>
         </div>
