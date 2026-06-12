@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -25,6 +25,9 @@ import {
   TeamOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
+import { debounce } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
 const { Title } = Typography;
@@ -60,9 +63,6 @@ function statusColor(status: string) {
 
 export default function UsersPage() {
   const { message } = App.useApp();
-  const [data, setData] = useState<UserItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
@@ -73,71 +73,65 @@ export default function UsersPage() {
   const [resetPasswordUser, setResetPasswordUser] = useState<UserItem | null>(
     null,
   );
-  const [submitting, setSubmitting] = useState(false);
 
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
 
-  // ── manual search ───────────────────────────────────────────
+  // ── debounced search ────────────────────────────────────────
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSubmittedSearch(value);
+        setPagination((p) => ({ ...p, offset: 0 }));
+      }, 400),
+    [],
+  );
 
-  const handleSearch = () => {
-    setSubmittedSearch(search);
-    setPagination((p) => ({ ...p, offset: 0 }));
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    debouncedSearch(value);
   };
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
+  // ── fetch users ─────────────────────────────────────────────
+  const {
+    data: listData = { items: [], total: 0 },
+    loading,
+    run: fetchUsers,
+  } = useApi<UserListResponse>(
+    () => {
       const params = new URLSearchParams({
         offset: String(pagination.offset),
         limit: String(pagination.limit),
       });
       if (submittedSearch.trim()) params.set("search", submittedSearch.trim());
-      const res = await apiFetch<UserListResponse>(
-        `/users?${params.toString()}`,
-      );
-      setData(res.items);
-      setTotal(res.total);
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "加载用户列表失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination, submittedSearch, message]);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+      return `/users?${params.toString()}`;
+    },
+    {
+      refreshDeps: [pagination, submittedSearch],
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "加载用户列表失败");
+      },
+    },
+  );
 
   // ── create ──
-  const handleCreate = async (values: {
-    username: string;
-    display_name: string;
-    password: string;
-    role: string;
-  }) => {
-    setSubmitting(true);
-    try {
-      await apiFetch("/users", {
-        method: "POST",
-        body: JSON.stringify({ ...values, status: "active" }),
-      });
+  const { loading: creating, run: doCreate } = useApi("/users", {
+    method: "POST",
+    manual: true,
+    onSuccess: () => {
       message.success("用户创建成功");
       setCreateOpen(false);
       createForm.resetFields();
       fetchUsers();
-    } catch (err) {
+    },
+    onError: (err) => {
       message.error(err instanceof Error ? err.message : "创建失败");
-    } finally {
-      setSubmitting(false);
-    }
+    },
+  });
+
+  const handleCreate = (values: Record<string, string>) => {
+    doCreate({ ...values, status: "active" });
   };
 
   // ── edit ──
@@ -150,27 +144,30 @@ export default function UsersPage() {
     });
   };
 
-  const handleEdit = async (values: {
+  const { loading: updating, run: doUpdate } = useApi(
+    (id: number) => `/users/${id}`,
+    {
+      method: "PATCH",
+      manual: true,
+      onSuccess: () => {
+        message.success("用户信息已更新");
+        setEditUser(null);
+        editForm.resetFields();
+        fetchUsers();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "更新失败");
+      },
+    },
+  );
+
+  const handleEdit = (values: {
     display_name?: string;
     role?: string;
     status?: string;
   }) => {
     if (!editUser) return;
-    setSubmitting(true);
-    try {
-      await apiFetch(`/users/${editUser.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(values),
-      });
-      message.success("用户信息已更新");
-      setEditUser(null);
-      editForm.resetFields();
-      fetchUsers();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "更新失败");
-    } finally {
-      setSubmitting(false);
-    }
+    doUpdate(editUser.id, values);
   };
 
   // ── reset password ──
@@ -179,38 +176,48 @@ export default function UsersPage() {
     pwdForm.resetFields();
   };
 
-  const handleResetPassword = async (values: { new_password: string }) => {
+  const { loading: resetting, run: doResetPassword } = useApi(
+    (id: number) => `/users/${id}/reset-password`,
+    {
+      method: "POST",
+      manual: true,
+      onSuccess: () => {
+        message.success("密码已重置");
+        setResetPasswordUser(null);
+        pwdForm.resetFields();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "密码重置失败");
+      },
+    },
+  );
+
+  const handleResetPassword = (values: { new_password: string }) => {
     if (!resetPasswordUser) return;
-    setSubmitting(true);
-    try {
-      await apiFetch(`/users/${resetPasswordUser.id}/reset-password`, {
-        method: "POST",
-        body: JSON.stringify(values),
-      });
-      message.success("密码已重置");
-      setResetPasswordUser(null);
-      pwdForm.resetFields();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "密码重置失败");
-    } finally {
-      setSubmitting(false);
-    }
+    doResetPassword(resetPasswordUser.id, values);
   };
 
+  const submitting = creating || updating || resetting;
+
   // ── disable toggle ──
-  const toggleDisable = async (user: UserItem) => {
-    const newStatus = user.status === "active" ? "disabled" : "active";
-    const actionText = newStatus === "active" ? "启用" : "禁用";
-    try {
-      await apiFetch(`/users/${user.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
+  const { run: toggleDisable } = useApi((id: number) => `/users/${id}`, {
+    method: "PATCH",
+    manual: true,
+    onSuccess: (_data, params) => {
+      const body = params[1] as { status?: string } | undefined;
+      const newStatus = body?.status;
+      const actionText = newStatus === "active" ? "启用" : "禁用";
       message.success(`用户已${actionText}`);
       fetchUsers();
-    } catch (err) {
+    },
+    onError: (err) => {
       message.error(err instanceof Error ? err.message : `操作失败`);
-    }
+    },
+  });
+
+  const handleToggleDisable = (user: UserItem) => {
+    const newStatus = user.status === "active" ? "disabled" : "active";
+    toggleDisable(user.id, { status: newStatus });
   };
 
   const columns = [
@@ -272,7 +279,7 @@ export default function UsersPage() {
                 ? `确定要禁用用户"${record.display_name}"吗？`
                 : `确定要启用用户"${record.display_name}"吗？`
             }
-            onConfirm={() => toggleDisable(record)}
+            onConfirm={() => handleToggleDisable(record)}
             okText="确定"
             cancelText="取消"
             okButtonProps={{
@@ -329,15 +336,17 @@ export default function UsersPage() {
           <Input
             placeholder="搜索用户名或显示名称"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
+            onChange={(e) => handleSearchChange(e.target.value)}
             style={{ width: 300 }}
             allowClear
           />
           <Button
             type="primary"
             icon={<SearchOutlined />}
-            onClick={handleSearch}
+            onClick={() => {
+              setSubmittedSearch(search);
+              setPagination((p) => ({ ...p, offset: 0 }));
+            }}
           >
             搜索
           </Button>
@@ -346,13 +355,13 @@ export default function UsersPage() {
 
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={listData.items}
         rowKey="id"
         loading={loading}
         pagination={{
           current: Math.floor(pagination.offset / pagination.limit) + 1,
           pageSize: pagination.limit,
-          total,
+          total: listData.total,
           onChange: (page, pageSize) => {
             setPagination({
               offset: (page - 1) * pageSize,

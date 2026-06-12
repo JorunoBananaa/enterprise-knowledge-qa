@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -14,6 +14,8 @@ import {
 } from "antd";
 import { PlusOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
 import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 
@@ -67,39 +69,29 @@ const columns: ColumnsType<Document> = [
 ];
 
 export default function LibraryPage() {
-  const [docs, setDocs] = useState<Document[]>([]);
-  const [total, setTotal] = useState(0);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [filtering, setFiltering] = useState(false);
   const [category, setCategory] = useState<string>();
   const [status, setStatus] = useState<string>();
 
-  const fetchDocs = async () => {
-    try {
+  const {
+    data: docsData,
+    loading,
+    run: fetchDocs,
+  } = useApi<{ items: Document[]; total: number }>(
+    () => {
       const params = new URLSearchParams();
       if (category) params.set("category_id", category);
       if (status) params.set("review_status", status);
-      const data = await apiFetch<{ items: Document[]; total: number }>(
-        `/documents?${params.toString()}`,
-      );
-      setDocs(data.items);
-      setTotal(data.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setInitialLoading(false);
-      setFiltering(false);
-    }
-  };
+      return `/documents?${params.toString()}`;
+    },
+    { refreshDeps: [category, status] },
+  );
 
   const handleFilter = () => {
-    setFiltering(true);
     fetchDocs();
   };
 
-  useEffect(() => {
-    fetchDocs();
-  }, []);
+  const docs = docsData?.items ?? [];
+  const total = docsData?.total ?? 0;
 
   return (
     <div className="max-w-[1060px] mx-auto">
@@ -145,7 +137,7 @@ export default function LibraryPage() {
           />
           <Button
             icon={<SearchOutlined />}
-            loading={filtering}
+            loading={loading}
             onClick={handleFilter}
           >
             应用筛选
@@ -153,7 +145,7 @@ export default function LibraryPage() {
         </Space>
       </Card>
 
-      {initialLoading ? (
+      {loading ? (
         <Spin spinning>
           <div style={{ minHeight: 200 }} />
         </Spin>
@@ -164,7 +156,7 @@ export default function LibraryPage() {
           columns={columns}
           dataSource={docs}
           rowKey="id"
-          loading={filtering}
+          loading={loading}
           pagination={{
             total,
             pageSize: 20,

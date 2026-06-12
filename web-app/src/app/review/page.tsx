@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { List, Button, Card, Space, Typography, Spin, Empty, App } from "antd";
 import { CheckOutlined, CloseOutlined, AuditOutlined } from "@ant-design/icons";
-import { apiFetch } from "@/lib/api";
+import { useApi } from "@/lib/use-api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 
 const { Title, Text } = Typography;
@@ -18,47 +17,44 @@ interface Document {
 }
 
 export default function ReviewPage() {
-  const [docs, setDocs] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
   const { message } = App.useApp();
 
-  const fetchDocs = async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch<{ items: Document[] }>(
-        "/documents?review_status=pending_review",
-      );
-      setDocs(data.items);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: docsData,
+    loading,
+    run: fetchDocs,
+  } = useApi<{ items: Document[] }>("/documents?review_status=pending_review");
+  const docs = docsData?.items;
 
-  useEffect(() => {
-    fetchDocs();
-  }, []);
+  const { run: handleApprove } = useApi(
+    (id: number) => `/review/documents/${id}/approve`,
+    {
+      method: "POST",
+      manual: true,
+      onSuccess: () => {
+        message.success("文档已通过审核并完成索引");
+        fetchDocs();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "审核通过操作失败");
+      },
+    },
+  );
 
-  const handleApprove = async (id: number) => {
-    try {
-      await apiFetch(`/review/documents/${id}/approve`, { method: "POST" });
-      message.success("文档已通过审核并完成索引");
-      fetchDocs();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "审核通过操作失败");
-    }
-  };
-
-  const handleReject = async (id: number) => {
-    try {
-      await apiFetch(`/review/documents/${id}/reject`, { method: "POST" });
-      message.success("文档已驳回");
-      fetchDocs();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "驳回操作失败");
-    }
-  };
+  const { run: handleReject } = useApi(
+    (id: number) => `/review/documents/${id}/reject`,
+    {
+      method: "POST",
+      manual: true,
+      onSuccess: () => {
+        message.success("文档已驳回");
+        fetchDocs();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "驳回操作失败");
+      },
+    },
+  );
 
   return (
     <div className="max-w-[1060px] mx-auto">
@@ -77,11 +73,11 @@ export default function ReviewPage() {
 
       <Card>
         <Spin spinning={loading}>
-          {!loading && docs.length === 0 ? (
+          {!loading && (docs ?? []).length === 0 ? (
             <Empty description="暂无待审核文档" />
           ) : (
             <List
-              dataSource={docs}
+              dataSource={docs ?? []}
               renderItem={(doc) => (
                 <List.Item
                   actions={[

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -24,6 +24,8 @@ import {
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
 import { apiFetch } from "@/lib/api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
 import type { CurrentUser } from "@/lib/auth-client";
@@ -42,54 +44,70 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [qaSessions, setQaSessions] = useState<SessionItem[]>([]);
 
   const currentSessionId = searchParams.get("session_id");
 
-  useEffect(() => {
-    if (pathname === "/login") {
-      setLoading(false);
-      return;
-    }
+  // ── current user ──
+  const { data: user = null, loading: userLoading } = useRequest(
+    async () => {
+      if (pathname === "/login") return null;
+      return getCurrentUser();
+    },
+    {
+      refreshDeps: [pathname],
+      onError: () => {
+        if (pathname !== "/login") {
+          router.replace(buildLoginUrl(pathname));
+        }
+      },
+    },
+  );
 
-    getCurrentUser()
-      .then((u) => {
-        setUser(u);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-        router.replace(buildLoginUrl(pathname));
-      });
-  }, [pathname, router]);
+  // ── qa sessions ──
+  const { data: qaSessions = [], run: loadQaSessions } = useApi<SessionItem[]>(
+    "/qa/sessions",
+    {
+      refreshDeps: [!!user],
+    },
+  );
 
-  const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      await apiFetch(`/qa/sessions/${id}`, { method: "DELETE" });
-      message.success("会话已删除");
-      if (currentSessionId === String(id)) {
-        router.push("/qa");
-      }
-      loadQaSessions();
-      window.dispatchEvent(new Event("qa:sessions-updated"));
-    } catch {
-      message.error("删除会话失败");
-    }
-  };
+  // ── delete session ──
+  const { run: handleDeleteSession } = useApi(
+    (id: number) => `/qa/sessions/${id}`,
+    {
+      method: "DELETE",
+      manual: true,
+      onSuccess: (_data, params) => {
+        const [id] = params;
+        message.success("会话已删除");
+        if (currentSessionId === String(id)) {
+          router.push("/qa");
+        }
+        loadQaSessions();
+        window.dispatchEvent(new Event("qa:sessions-updated"));
+      },
+      onError: () => {
+        message.error("删除会话失败");
+      },
+    },
+  );
 
-  const handleLogout = async () => {
-    try {
+  // ── logout ──
+  const { run: handleLogout } = useRequest(
+    async () => {
       await logout();
-    } catch {
-      // ignore network errors during logout
-    }
-    setUser(null);
-    router.push("/login");
-  };
+    },
+    {
+      manual: true,
+      onSuccess: () => {
+        router.push("/login");
+      },
+      onError: () => {
+        // ignore network errors during logout
+        router.push("/login");
+      },
+    },
+  );
 
   const selectedKey = useMemo(() => {
     if (pathname.startsWith("/library")) return "/library";
@@ -103,20 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const isQaPage = selectedKey === "/qa";
 
-  const loadQaSessions = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await apiFetch<SessionItem[]>("/qa/sessions");
-      setQaSessions(data);
-    } catch {
-      // The shell should stay usable even when the session list cannot load.
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadQaSessions();
-  }, [loadQaSessions]);
-
+  // ── listen for external session updates ──
   useEffect(() => {
     window.addEventListener("qa:sessions-updated", loadQaSessions);
     return () => {
@@ -170,7 +175,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <App>{children}</App>;
   }
 
-  if (loading) {
+  if (userLoading) {
     return (
       <Layout
         style={{
@@ -257,12 +262,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <Popconfirm
                         title="确定删除此会话？"
                         description="删除后不可恢复"
-                        onConfirm={(e) =>
-                          handleDeleteSession(
-                            session.id,
-                            e as unknown as React.MouseEvent,
-                          )
-                        }
+                        onConfirm={() => handleDeleteSession(session.id)}
                         onCancel={(e) => {
                           (e as React.MouseEvent).stopPropagation();
                         }}

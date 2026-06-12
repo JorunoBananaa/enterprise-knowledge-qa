@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
@@ -14,6 +21,9 @@ import {
 } from "antd";
 import { RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
+import { throttle } from "@/lib/utils";
 import { apiFetch, apiFetchStream } from "@/lib/api";
 import CitationList from "@/components/CitationList";
 
@@ -86,55 +96,44 @@ function QAPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessageOut[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  const [llmConfigs, setLlmConfigs] = useState<LLMConfigBrief[]>([]);
   const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(
     undefined,
   );
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // ── load session list ────────────────────────────────────────────
+  // ── load session list ──
+  const { data: sessions = [], run: loadSessions } =
+    useApi<SessionItem[]>("/qa/sessions");
 
-  const loadSessions = useCallback(async () => {
-    try {
-      const data = await apiFetch<SessionItem[]>("/qa/sessions");
-      setSessions(data);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  // ── load LLM configs ───────────────────────────────────────────
-
-  useEffect(() => {
-    apiFetch<LLMConfigBrief[]>("/llm-configs/brief")
-      .then((configs) => {
-        setLlmConfigs(configs);
+  // ── load LLM configs ──
+  const { data: llmConfigs = [] } = useApi<LLMConfigBrief[]>(
+    "/llm-configs/brief",
+    {
+      onSuccess: (configs) => {
         const active = configs.find((c) => c.is_active);
         if (active) setSelectedLlmId(active.id);
-      })
-      .catch(() => {});
-  }, []);
+      },
+    },
+  );
 
-  // ── load messages of a session ───────────────────────────────────
-
-  const loadMessages = useCallback(async (sessionId: number) => {
-    try {
+  // ── load messages of a session ──
+  const { run: loadMessages } = useRequest(
+    async (sessionId: number) => {
       const data = await apiFetch<SessionDetail>(`/qa/sessions/${sessionId}`);
       setMessages(data.messages ?? []);
-    } catch {
-      message.error("加载会话记录失败");
-    }
-  }, []);
+    },
+    {
+      manual: true,
+      onError: () => {
+        message.error("加载会话记录失败");
+      },
+    },
+  );
 
   useEffect(() => {
     const rawSessionId = searchParams.get("session_id");
@@ -179,7 +178,6 @@ function QAPageContent() {
     const placeholderId = placeholder.id;
 
     try {
-      let isFirstChunk = true;
       let sessionId = activeId;
 
       for await (const event of apiFetchStream("/qa/ask/stream", {
@@ -247,11 +245,19 @@ function QAPageContent() {
     }
   };
 
-  // ── auto-scroll to bottom ────────────────────────────────────────
+  // ── auto-scroll to bottom (throttled) ──────────────────────────
+
+  const scrollToBottom = useMemo(
+    () =>
+      throttle(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100),
+    [],
+  );
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   // ── derived state ────────────────────────────────────────────────
 

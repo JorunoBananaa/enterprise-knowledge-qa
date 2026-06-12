@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Form,
   Input,
@@ -36,7 +36,8 @@ import {
   WifiOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
-import { apiFetch } from "@/lib/api";
+import { useApi } from "@/lib/use-api";
+import { omit, maskString } from "@/lib/utils";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -108,43 +109,25 @@ const PROVIDER_TAG_COLORS: Record<string, string> = {
   moonshot: "geekblue",
 };
 
-/** 脱敏展示 API Key：只显示前 3 位 + 后 3 位 */
-function maskApiKey(key: string): string {
-  if (!key || key.length <= 8) return "****";
-  return key.slice(0, 3) + "****" + key.slice(-3);
-}
-
 export default function LLMConfigPage() {
-  const [configs, setConfigs] = useState<LLMConfigItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
+  // ── fetch configs ──
+  const {
+    data: configs = [],
+    loading,
+    run: fetchConfigs,
+  } = useApi<LLMConfigItem[]>("/llm-configs/");
+
   const activeConfig = useMemo(
     () => configs.find((c) => c.is_active),
     [configs],
   );
-
-  const fetchConfigs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch<LLMConfigItem[]>("/llm-configs/");
-      setConfigs(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchConfigs();
-  }, [fetchConfigs]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -184,71 +167,102 @@ export default function LLMConfigPage() {
     });
   };
 
-  const handleSubmit = async (values: Record<string, string>) => {
-    setSubmitting(true);
-    try {
-      const body: Record<string, string | null> = {
-        name: values.name,
-        provider: values.provider,
-        model_name: values.model_name,
-        api_key: values.api_key,
-        base_url: values.base_url || null,
-      };
+  // ── submit (create / edit) ──
+  const onMutateSuccess = () => {
+    setModalOpen(false);
+    fetchConfigs();
+  };
+  const onMutateError = (err: Error) => {
+    message.error(err instanceof Error ? err.message : "操作失败");
+  };
 
-      if (editingId) {
-        if (!values.api_key) delete body.api_key;
-        await apiFetch(`/llm-configs/${editingId}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
-        message.success("配置已更新");
-      } else {
-        await apiFetch("/llm-configs/", {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
-        message.success("大模型配置已创建");
-      }
-      setModalOpen(false);
-      fetchConfigs();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "操作失败");
-    } finally {
-      setSubmitting(false);
+  const { loading: creating, run: createConfig } = useApi("/llm-configs/", {
+    method: "POST",
+    manual: true,
+    onSuccess: onMutateSuccess,
+    onError: onMutateError,
+  });
+
+  const { loading: updating, run: updateConfig } = useApi(
+    (id: number) => `/llm-configs/${id}`,
+    {
+      method: "PATCH",
+      manual: true,
+      onSuccess: onMutateSuccess,
+      onError: onMutateError,
+    },
+  );
+
+  const submitting = creating || updating;
+
+  const handleSubmit = (values: Record<string, string>) => {
+    const body: Record<string, string | null> = {
+      name: values.name,
+      provider: values.provider,
+      model_name: values.model_name,
+      api_key: values.api_key,
+      base_url: values.base_url || null,
+    };
+
+    if (editingId != null) {
+      const payload = values.api_key ? body : omit(body, "api_key");
+      updateConfig(editingId, payload);
+    } else {
+      createConfig(body);
     }
   };
 
-  const handleActivate = async (id: number) => {
-    try {
-      await apiFetch(`/llm-configs/${id}/activate`, { method: "POST" });
-      message.success("已设为默认模型");
-      fetchConfigs();
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "设置默认模型失败");
-    }
-  };
+  // ── activate ──
+  const { run: handleActivate } = useApi(
+    (id: number) => `/llm-configs/${id}/activate`,
+    {
+      method: "POST",
+      manual: true,
+      onSuccess: () => {
+        message.success("已设为默认模型");
+        fetchConfigs();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "设置默认模型失败");
+      },
+    },
+  );
 
-  const handleTest = async (id: number) => {
+  // ── test connectivity ──
+  const { loading: testing, run: runTest } = useApi(
+    (id: number) => `/llm-configs/${id}/test`,
+    {
+      method: "POST",
+      manual: true,
+      onSuccess: () => {
+        message.success("连通性测试通过");
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "连通性测试失败");
+      },
+      onFinally: () => {
+        setTestingId(null);
+      },
+    },
+  );
+
+  const handleTest = (id: number) => {
     setTestingId(id);
-    try {
-      await apiFetch(`/llm-configs/${id}/test`, { method: "POST" });
-      message.success("连通性测试通过");
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : "连通性测试失败");
-    } finally {
-      setTestingId(null);
-    }
+    runTest(id);
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await apiFetch(`/llm-configs/${id}`, { method: "DELETE" });
+  // ── delete ──
+  const { run: handleDelete } = useApi((id: number) => `/llm-configs/${id}`, {
+    method: "DELETE",
+    manual: true,
+    onSuccess: () => {
       message.success("配置已删除");
       fetchConfigs();
-    } catch (err) {
+    },
+    onError: (err) => {
       message.error(err instanceof Error ? err.message : "删除失败");
-    }
-  };
+    },
+  });
 
   const columns = [
     {

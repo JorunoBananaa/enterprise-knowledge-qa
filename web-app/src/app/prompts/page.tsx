@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Form, Input, Button, Card, Typography, Tabs, Spin, App } from "antd";
 import { SettingOutlined, FileTextOutlined } from "@ant-design/icons";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
 import { apiFetch } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth-client";
 import type { CurrentUser } from "@/lib/auth-client";
@@ -14,31 +16,23 @@ const { TextArea } = Input;
 
 function SystemPromptPanel() {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    apiFetch<{ content: string }>("/prompts/system")
-      .then((data) => form.setFieldsValue({ content: data.content || "" }))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [form]);
+  const { loading } = useRequest(async () => {
+    const data = await apiFetch<{ content: string }>("/prompts/system");
+    form.setFieldsValue({ content: data.content || "" });
+  });
 
-  const handleSave = async (values: { content: string }) => {
-    setSaving(true);
-    try {
-      await apiFetch("/prompts/system", {
-        method: "PUT",
-        body: JSON.stringify(values),
-      });
+  const { loading: saving, run: handleSave } = useApi("/prompts/system", {
+    method: "PUT",
+    manual: true,
+    onSuccess: () => {
       message.success("系统提示词已保存");
-    } catch (err) {
+    },
+    onError: (err) => {
       message.error(err instanceof Error ? err.message : "保存失败");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+  });
 
   if (loading) {
     return (
@@ -52,7 +46,7 @@ function SystemPromptPanel() {
     <div>
       <div className="prompt-panel-intro">
         <Paragraph type="secondary" className="!mb-0">
-        系统提示词定义了回答的基础规则，对所有问答生效。
+          系统提示词定义了回答的基础规则，对所有问答生效。
         </Paragraph>
       </div>
 
@@ -76,33 +70,23 @@ function SystemPromptPanel() {
 
 function PersonalPromptPanel() {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    apiFetch<{ content: string }>("/prompts/me")
-      .then((data) => {
-        form.setFieldsValue({ content: data.content || "" });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [form]);
+  const { loading } = useRequest(async () => {
+    const data = await apiFetch<{ content: string }>("/prompts/me");
+    form.setFieldsValue({ content: data.content || "" });
+  });
 
-  const handleSave = async (values: { content: string }) => {
-    setSaving(true);
-    try {
-      await apiFetch("/prompts/me", {
-        method: "PUT",
-        body: JSON.stringify(values),
-      });
+  const { loading: saving, run: handleSave } = useApi("/prompts/me", {
+    method: "PUT",
+    manual: true,
+    onSuccess: () => {
       message.success("个人提示词已保存");
-    } catch (err) {
+    },
+    onError: (err) => {
       message.error(err instanceof Error ? err.message : "保存失败");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+  });
 
   if (loading) {
     return (
@@ -116,7 +100,7 @@ function PersonalPromptPanel() {
     <div>
       <div className="prompt-panel-intro">
         <Paragraph type="secondary" className="!mb-0">
-        自定义回答的风格和格式，仅对你本人可见。
+          自定义回答的风格和格式，仅对你本人可见。
         </Paragraph>
       </div>
 

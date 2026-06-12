@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Descriptions, Card, Typography, Spin, Alert } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
 import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 
@@ -24,18 +25,12 @@ interface Document {
 
 export default function DocumentDetailPage() {
   const params = useParams();
-  const [doc, setDoc] = useState<Document | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    apiFetch<{ items: Document[] }>("/documents")
-      .then((data) => {
-        const found = data.items.find((d) => d.id === Number(params.id));
-        setDoc(found || null);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [params.id]);
+  const { data: docsData, loading } = useApi<{ items: Document[] }>(
+    "/documents",
+  );
+
+  const doc = docsData?.items.find((d) => d.id === Number(params.id)) || null;
 
   if (loading)
     return (

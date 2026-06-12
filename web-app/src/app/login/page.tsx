@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Form, Input, Button, Typography, Alert, Card } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { useRequest } from "ahooks";
 import { login, isSafeNext } from "@/lib/auth-client";
 
 const { Title, Text } = Typography;
@@ -11,31 +12,34 @@ const { Title, Text } = Typography;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (values: {
-    username: string;
-    password: string;
-  }) => {
-    setError("");
-    setLoading(true);
-
-    try {
+  const {
+    loading,
+    error,
+    run: handleSubmit,
+  } = useRequest(
+    async (values: { username: string; password: string }) => {
       await login(values.username, values.password);
-
       const next = searchParams.get("next");
       if (isSafeNext(next)) {
         router.replace(next);
       } else {
         router.replace("/qa");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    {
+      manual: true,
+      onError: () => {
+        // error is automatically captured by useRequest
+      },
+    },
+  );
+
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : "登录失败"
+    : "";
 
   return (
     <div
@@ -77,9 +81,9 @@ function LoginForm() {
           <Text type="secondary">登录您的账号</Text>
         </div>
 
-        {error && (
+        {errorMessage && (
           <Alert
-            message={error}
+            message={errorMessage}
             type="error"
             showIcon
             style={{ marginBottom: 16 }}

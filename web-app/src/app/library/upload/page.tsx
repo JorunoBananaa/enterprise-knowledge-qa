@@ -15,6 +15,8 @@ import {
 } from "antd";
 import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
+import { useRequest } from "ahooks";
+import { useApi } from "@/lib/use-api";
 import { apiFetch } from "@/lib/api";
 
 const { Title } = Typography;
@@ -23,35 +25,34 @@ const { Dragger } = Upload;
 export default function UploadPage() {
   const router = useRouter();
   const [form] = Form.useForm();
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  const handleSubmit = async (values: {
-    title: string;
-    category_id: string;
-  }) => {
-    if (!file) return;
-    setError("");
-    setUploading(true);
+  const {
+    loading: uploading,
+    error,
+    run: handleSubmit,
+  } = useApi("/documents", {
+    method: "POST",
+    manual: true,
+    onSuccess: () => {
+      router.push("/library");
+    },
+  });
 
+  const wrappedSubmit = (values: { title: string; category_id: string }) => {
+    if (!file) throw new Error("请选择文件");
     const formData = new FormData();
     formData.append("title", values.title);
     formData.append("category_id", values.category_id);
     formData.append("file", file);
-
-    try {
-      await apiFetch("/documents", {
-        method: "POST",
-        body: formData,
-      });
-      router.push("/library");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "上传失败");
-    } finally {
-      setUploading(false);
-    }
+    handleSubmit(formData);
   };
+
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : "上传失败"
+    : "";
 
   const uploadProps: UploadProps = {
     maxCount: 1,
@@ -85,15 +86,15 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {error && (
-        <Alert message={error} type="error" showIcon className="!mb-4" />
+      {errorMessage && (
+        <Alert message={errorMessage} type="error" showIcon className="!mb-4" />
       )}
 
       <Card>
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleSubmit}
+          onFinish={wrappedSubmit}
           initialValues={{ category_id: "1" }}
         >
           <Form.Item
