@@ -45,9 +45,16 @@ export function useApi<
   return useRequest(
     async (...args: FullParams<M, TPathParams>) => {
       // 计算最终路径
-      // pathOrBuilder 只关心路径参数，body 不参与路径构建
+      // 非 GET 时，仅当最后一个参数是普通对象（非数组）时才视为 body
+      const lastArg = args[args.length - 1];
+      const hasBody =
+        method !== "GET" &&
+        lastArg !== undefined &&
+        typeof lastArg === "object" &&
+        !Array.isArray(lastArg);
+
       const pathParams =
-        typeof pathOrBuilder === "function" && method !== "GET"
+        typeof pathOrBuilder === "function" && hasBody
           ? args.slice(0, -1)
           : args;
       const path =
@@ -55,16 +62,11 @@ export function useApi<
           ? pathOrBuilder(...(pathParams as TPathParams))
           : pathOrBuilder;
 
-      // 非 GET 时，最后一个非函数参数视为 request body
+      // 非 GET 时，最后一个普通对象参数视为 request body
       const fetchOptions: RequestInit = {};
       if (method !== "GET") {
         fetchOptions.method = method;
-        const lastArg = args[args.length - 1];
-        if (
-          lastArg !== undefined &&
-          typeof lastArg === "object" &&
-          !Array.isArray(lastArg)
-        ) {
+        if (hasBody) {
           fetchOptions.body =
             lastArg instanceof FormData ? lastArg : JSON.stringify(lastArg);
         }

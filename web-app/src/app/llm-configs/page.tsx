@@ -173,6 +173,7 @@ export default function LLMConfigPage() {
   // ── submit (create / edit) ──
   const onMutateSuccess = () => {
     setModalOpen(false);
+    message.success(editingId != null ? "配置已更新" : "配置已创建");
     fetchConfigs();
   };
   const onMutateError = (err: Error) => {
