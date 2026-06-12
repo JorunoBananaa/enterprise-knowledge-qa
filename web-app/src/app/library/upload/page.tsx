@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Form, Input, Select, Button, Upload, Alert, Card, Spin } from "antd";
 import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
@@ -13,8 +13,17 @@ const { Dragger } = Upload;
 
 export default function UploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form] = Form.useForm();
   const [file, setFile] = useState<File | null>(null);
+
+  // 从 URL 参数预选分类
+  const presetCategoryId = searchParams.get("categoryId");
+  useEffect(() => {
+    if (presetCategoryId) {
+      form.setFieldValue("category_id", presetCategoryId);
+    }
+  }, [presetCategoryId, form]);
 
   const {
     loading: uploading,
@@ -27,6 +36,12 @@ export default function UploadPage() {
       router.push("/library");
     },
   });
+
+  // ── fetch categories for dropdown ──
+  const { data: catData } = useApi<{ items: { id: number; name: string }[] }>(
+    "/categories",
+  );
+  const categories = catData?.items ?? [];
 
   const wrappedSubmit = (values: { title: string; category_id: string }) => {
     if (!file) throw new Error("请选择文件");
@@ -75,12 +90,7 @@ export default function UploadPage() {
 
       <Card>
         <Spin spinning={uploading} tip="正在上传并处理文档...">
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={wrappedSubmit}
-            initialValues={{ category_id: "1" }}
-          >
+          <Form form={form} layout="vertical" onFinish={wrappedSubmit}>
             <Form.Item
               name="title"
               label="标题"
@@ -94,7 +104,13 @@ export default function UploadPage() {
               label="分类"
               rules={[{ required: true, message: "请选择分类" }]}
             >
-              <Select options={[{ label: "产品 A", value: "1" }]} />
+              <Select
+                placeholder="请选择分类"
+                options={categories.map((c) => ({
+                  label: c.name,
+                  value: String(c.id),
+                }))}
+              />
             </Form.Item>
 
             <Form.Item label="文件（支持 PDF、Word、PPT、Excel）">

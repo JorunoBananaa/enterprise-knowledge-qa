@@ -164,7 +164,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         key: "/library",
         href: "/library",
         icon: BookOutlined,
-        label: "知识库管理",
+        label: "知识库",
       },
       {
         key: "/prompts",

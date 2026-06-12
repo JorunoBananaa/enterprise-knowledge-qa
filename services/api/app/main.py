@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 import app.models  # noqa: F401  # register all models with Base.metadata
 from app.api.routes.auth import router as auth_router
+from app.api.routes.categories import router as categories_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.llm_config import router as llm_config_router
 from app.api.routes.prompts import router as prompts_router
@@ -76,6 +77,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(categories_router, prefix="/categories", tags=["categories"])
 app.include_router(documents_router, prefix="/documents", tags=["documents"])
 app.include_router(llm_config_router, prefix="/llm-configs", tags=["llm-configs"])
 app.include_router(prompts_router, prefix="/prompts", tags=["prompts"])
