@@ -7,10 +7,12 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   App,
 } from "antd";
@@ -18,6 +20,8 @@ import {
   PlusOutlined,
   EditOutlined,
   KeyOutlined,
+  StopOutlined,
+  CheckOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { apiFetch } from "@/lib/api";
@@ -54,7 +58,7 @@ function statusColor(status: string) {
 }
 
 export default function UsersPage() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [data, setData] = useState<UserItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -195,24 +199,19 @@ export default function UsersPage() {
   };
 
   // ── disable toggle ──
-  const toggleDisable = (user: UserItem) => {
+  const toggleDisable = async (user: UserItem) => {
     const newStatus = user.status === "active" ? "disabled" : "active";
     const actionText = newStatus === "active" ? "启用" : "禁用";
-    modal.confirm({
-      title: `确定要${actionText}用户"${user.display_name}"吗？`,
-      onOk: async () => {
-        try {
-          await apiFetch(`/users/${user.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ status: newStatus }),
-          });
-          message.success(`用户已${actionText}`);
-          fetchUsers();
-        } catch (err) {
-          message.error(err instanceof Error ? err.message : `操作失败`);
-        }
-      },
-    });
+    try {
+      await apiFetch(`/users/${user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      message.success(`用户已${actionText}`);
+      fetchUsers();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : `操作失败`);
+    }
   };
 
   const columns = [
@@ -245,29 +244,56 @@ export default function UsersPage() {
     {
       title: "操作",
       key: "actions",
+      width: 280,
       render: (_: unknown, record: UserItem) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(record)}
+        <Space size={4}>
+          <Tooltip title="编辑用户信息与角色">
+            <Button
+              type="default"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEdit(record)}
+            >
+              编辑
+            </Button>
+          </Tooltip>
+          <Tooltip title="为该用户重置登录密码">
+            <Button
+              type="default"
+              size="small"
+              icon={<KeyOutlined />}
+              onClick={() => openResetPassword(record)}
+            >
+              重置密码
+            </Button>
+          </Tooltip>
+          <Popconfirm
+            title={
+              record.status === "active"
+                ? `确定要禁用用户"${record.display_name}"吗？`
+                : `确定要启用用户"${record.display_name}"吗？`
+            }
+            onConfirm={() => toggleDisable(record)}
+            okText="确定"
+            cancelText="取消"
+            okButtonProps={{
+              danger: record.status === "active",
+            }}
           >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            icon={<KeyOutlined />}
-            onClick={() => openResetPassword(record)}
-          >
-            重置密码
-          </Button>
-          <Button
-            type="link"
-            danger={record.status === "active"}
-            onClick={() => toggleDisable(record)}
-          >
-            {record.status === "active" ? "禁用" : "启用"}
-          </Button>
+            <Button
+              size="small"
+              danger={record.status === "active"}
+              icon={
+                record.status === "active" ? (
+                  <StopOutlined />
+                ) : (
+                  <CheckOutlined />
+                )
+              }
+            >
+              {record.status === "active" ? "禁用" : "启用"}
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
