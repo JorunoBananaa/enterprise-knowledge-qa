@@ -41,6 +41,85 @@ code {
   color: #334155;
 }
 
+/* ── Cursor ─────────────────────────────────────────────────────── */
+/*
+ * Cursor 分层策略：
+ *   pointer   — 可点击的交互元素
+ *   text      — 文本输入区域
+ *   not-allowed — 禁用态
+ *   wait      — 加载 / 等待中
+ *   default   — 只读内容区域（无操作暗示）
+ */
+
+/* 全局：可点击元素 */
+a,
+button,
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
+/* 全局：文本输入 */
+input:not([type]),
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="number"],
+textarea,
+[contenteditable="true"] {
+  cursor: text;
+}
+
+/* 全局：禁用态 */
+button:disabled,
+input:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Ant Design 禁用态覆盖 */
+.ant-btn:disabled,
+.ant-btn-disabled,
+.ant-input-disabled,
+.ant-select-disabled .ant-select-selector,
+.ant-picker-disabled,
+.ant-radio-disabled,
+.ant-checkbox-disabled,
+.ant-switch-disabled {
+  cursor: not-allowed !important;
+}
+
+/* Ant Design 可点击组件 */
+.ant-btn:not(:disabled),
+.ant-select:not(.ant-select-disabled) .ant-select-selector,
+.ant-picker:not(.ant-picker-disabled),
+.ant-radio:not(.ant-radio-disabled),
+.ant-checkbox:not(.ant-checkbox-disabled),
+.ant-switch:not(.ant-switch-disabled),
+.ant-tabs-tab,
+.ant-pagination-item,
+.ant-breadcrumb-link,
+.ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled),
+.ant-menu-item:not(.ant-menu-item-disabled),
+.ant-upload,
+.ant-upload-drag,
+.ant-table-thead .ant-table-column-sorter,
+.ant-collapse-header,
+.ant-tree-node-content-wrapper {
+  cursor: pointer;
+}
+
+/* Ant Design 文本输入组件 */
+.ant-input:not(.ant-input-disabled),
+.ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) input,
+textarea.ant-input:not(.ant-input-disabled),
+.ant-input-number:not(.ant-input-number-disabled) input {
+  cursor: text;
+}
+
 /* ── App shell ─────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
@@ -61,6 +140,7 @@ code {
   gap: 10px;
   min-width: 0;
   color: var(--app-text);
+  cursor: pointer;
 }
 
 .app-shell-brand-icon {
@@ -123,6 +203,7 @@ code {
   color: #fff;
   font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .app-sidebar-new:hover {
@@ -146,6 +227,7 @@ code {
   color: #575f6c;
   font-size: 14px;
   font-weight: 500;
+  cursor: pointer;
 }
 
 .app-sidebar-nav-item:hover,
@@ -184,6 +266,7 @@ code {
   border-radius: 8px;
   padding: 6px 5px 6px 11px;
   color: var(--app-text);
+  cursor: pointer;
 }
 
 .app-sidebar-session:hover,
@@ -195,6 +278,7 @@ code {
   flex: 1;
   min-width: 0;
   color: inherit;
+  cursor: pointer;
 }
 
 .app-sidebar-session-title {
@@ -502,12 +586,14 @@ code {
   overflow: auto;
   background: var(--app-surface);
   padding: 34px 24px 28px;
+  cursor: default;
 }
 
 .qa-message-stack {
   width: 100%;
   max-width: 680px;
   margin: 0 auto;
+  cursor: default;
 }
 
 .qa-empty {
@@ -591,6 +677,7 @@ code {
   gap: 8px;
   margin-bottom: 8px;
   color: var(--app-muted);
+  cursor: default;
 }
 
 .qa-compose {

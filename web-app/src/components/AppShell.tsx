@@ -244,14 +244,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         active ? "app-sidebar-session-active" : ""
                       }`}
                     >
-                      <Link
-                        href={`/qa?session_id=${session.id}`}
+                      <div
+                        onClick={() =>
+                          router.push(`/qa?session_id=${session.id}`)
+                        }
                         className="app-sidebar-session-link"
                       >
                         <span className="app-sidebar-session-title">
                           {session.title || "新会话"}
                         </span>
-                      </Link>
+                      </div>
                       <Popconfirm
                         title="确定删除此会话？"
                         description="删除后不可恢复"
