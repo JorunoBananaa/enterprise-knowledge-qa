@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { List, Button, Card, Space, Typography, Spin, Empty, App } from "antd";
 import { CheckOutlined, CloseOutlined, AuditOutlined } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
@@ -18,6 +19,7 @@ interface Document {
 
 export default function ReviewPage() {
   const { message } = App.useApp();
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   const {
     data: docsData,
@@ -31,12 +33,18 @@ export default function ReviewPage() {
     {
       method: "POST",
       manual: true,
+      onBefore: () => {
+        // setActionLoadingId is set before calling run
+      },
       onSuccess: () => {
         message.success("文档已通过审核并完成索引");
         fetchDocs();
       },
       onError: (err) => {
         message.error(err instanceof Error ? err.message : "审核通过操作失败");
+      },
+      onFinally: () => {
+        setActionLoadingId(null);
       },
     },
   );
@@ -53,8 +61,21 @@ export default function ReviewPage() {
       onError: (err) => {
         message.error(err instanceof Error ? err.message : "驳回操作失败");
       },
+      onFinally: () => {
+        setActionLoadingId(null);
+      },
     },
   );
+
+  const doApprove = (id: number) => {
+    setActionLoadingId(id);
+    handleApprove(id);
+  };
+
+  const doReject = (id: number) => {
+    setActionLoadingId(id);
+    handleReject(id);
+  };
 
   return (
     <div className="max-w-[1060px] mx-auto">
@@ -84,14 +105,16 @@ export default function ReviewPage() {
                     <Button
                       type="primary"
                       icon={<CheckOutlined />}
-                      onClick={() => handleApprove(doc.id)}
+                      loading={actionLoadingId === doc.id}
+                      onClick={() => doApprove(doc.id)}
                     >
                       通过
                     </Button>,
                     <Button
                       danger
                       icon={<CloseOutlined />}
-                      onClick={() => handleReject(doc.id)}
+                      loading={actionLoadingId === doc.id}
+                      onClick={() => doReject(doc.id)}
                     >
                       驳回
                     </Button>,

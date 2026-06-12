@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
   Select,
+  Skeleton,
   Space,
   Spin,
   Tag,
@@ -122,7 +123,7 @@ function QAPageContent() {
   );
 
   // ── load messages of a session ──
-  const { run: loadMessages } = useRequest(
+  const { loading: messagesLoading, run: loadMessages } = useRequest(
     async (sessionId: number) => {
       const data = await apiFetch<SessionDetail>(`/qa/sessions/${sessionId}`);
       setMessages(data.messages ?? []);
@@ -293,7 +294,29 @@ function QAPageContent() {
 
         {/* Messages area */}
         <div ref={messagesContainerRef} className="qa-messages">
-          {messages.length === 0 ? (
+          {messagesLoading ? (
+            <div className="qa-message-stack" style={{ padding: "24px 32px" }}>
+              <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i}>
+                    <Skeleton
+                      active
+                      avatar={{ shape: "circle", size: 36 }}
+                      paragraph={{ rows: 1, width: "60%" }}
+                      title={false}
+                    />
+                    <Skeleton
+                      active
+                      avatar={{ shape: "circle", size: 36 }}
+                      paragraph={{ rows: 2 }}
+                      title={false}
+                      style={{ marginTop: 12 }}
+                    />
+                  </div>
+                ))}
+              </Space>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="qa-empty">
               <div className="qa-empty-icon">
                 <RobotOutlined

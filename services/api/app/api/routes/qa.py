@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,7 +9,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import settings
 from app.models.chat import ChatMessage, ChatSession, Citation
+from app.models.document_chunk import DocumentChunk
 from app.repositories.llm_config import get_active_llm_config, get_llm_config
 from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
@@ -17,6 +20,7 @@ from app.schemas.chat import (
     ChatSessionDetail,
     ChatSessionOut,
 )
+from app.services.embedding_factory import create_embeddings
 from app.services.llm_factory import create_chat_model
 from app.services.rag import answer_question_stream
 
@@ -68,8 +72,8 @@ def _resolve_session(
     return session
 
 
-def _resolve_llm(llm_config_id: int | None) -> Any | None:
-    """Resolve LLM from config; returns None for fake fallback."""
+def _resolve_llm(llm_config_id: int | None) -> Any:
+    """Resolve LLM from config; raises if no valid LLM is configured."""
     if llm_config_id is not None and llm_config_id > 0:
         cfg = get_llm_config(llm_config_id)
         if cfg is None:
@@ -84,20 +88,74 @@ def _resolve_llm(llm_config_id: int | None) -> Any | None:
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
-    if llm_config_id is None:
-        active = get_active_llm_config()
-        if active is not None:
-            try:
-                return create_chat_model(
-                    provider=active.provider,
-                    model_name=active.model_name,
-                    api_key=active.api_key,
-                    base_url=active.base_url,
-                )
-            except Exception:
-                pass
+    # llm_config_id is None → use active config
+    active = get_active_llm_config()
+    if active is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="没有活跃的大模型配置，请先在 LLM 配置页面设置一个活跃的模型",
+        )
+    try:
+        return create_chat_model(
+            provider=active.provider,
+            model_name=active.model_name,
+            api_key=active.api_key,
+            base_url=active.base_url,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
-    return None
+
+def _retrieve_chunks(
+    question: str,
+    db: Session,
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    """Retrieve the most relevant document chunks via pgvector ANN search.
+
+    Generates an embedding for the question, then performs cosine similarity
+    search against the document_chunks table.
+    """
+    provider = settings.embedding_provider
+
+    if provider == "huggingface":
+        embed_model = create_embeddings(
+            provider="huggingface",
+            model_name=settings.embedding_model_name,
+        )
+    else:
+        # Remote providers need an active LLM config for the API key
+        active_cfg = get_active_llm_config()
+        if active_cfg is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="没有活跃的大模型配置，无法执行向量检索",
+            )
+        embed_model = create_embeddings(
+            provider=active_cfg.provider,
+            model_name=settings.embedding_model_name,
+            api_key=active_cfg.api_key,
+            base_url=active_cfg.base_url,
+        )
+
+    query_embedding = embed_model.embed_query(question)
+
+    chunks = (
+        db.query(DocumentChunk)
+        .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
+        .limit(top_k)
+        .all()
+    )
+
+    return [
+        {
+            "chunk_id": chunk.id,
+            "document_id": chunk.document_id,
+            "locator": chunk.locator,
+            "text": chunk.text,
+        }
+        for chunk in chunks
+    ]
 
 
 # ── Sessions ──────────────────────────────────────────────────────────
@@ -217,9 +275,7 @@ async def ask_question_stream(
 
     session = _resolve_session(user_id, payload.session_id, payload.question, db)
 
-    # Build LLM synchronously (same logic as non-streaming)
-    from contextlib import asynccontextmanager
-
+    # Build LLM synchronously
     try:
         llm = _resolve_llm(payload.llm_config_id)
     except HTTPException:
@@ -227,15 +283,8 @@ async def ask_question_stream(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
-    # Retrieve chunks (fake for MVP)
-    fake_chunks = [
-        {
-            "chunk_id": 1,
-            "document_id": 1,
-            "locator": "page 1",
-            "text": "The standard warranty is 12 months from the date of purchase.",
-        }
-    ]
+    # Retrieve relevant chunks via pgvector ANN search
+    retrieved_chunks = _retrieve_chunks(payload.question, db)
 
     async def _stream_events():
         chunks_received: list[str] = []
@@ -244,7 +293,7 @@ async def ask_question_stream(
         try:
             async for event in answer_question_stream(
                 question=payload.question,
-                retrieved_chunks=fake_chunks,
+                retrieved_chunks=retrieved_chunks,
                 system_prompt="请根据公司知识库回答。回答应简洁有用。",
                 user_prompt=None,
                 llm=llm,
@@ -295,7 +344,6 @@ async def ask_question_stream(
                     return
 
         except Exception as exc:
-            import logging
             logging.getLogger(__name__).exception("Stream error")
             yield format_sse("error", {"message": f"流式生成失败: {exc}"})
 

@@ -71,6 +71,7 @@ export default function UsersPage() {
   const [resetPasswordUser, setResetPasswordUser] = useState<UserItem | null>(
     null,
   );
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -211,10 +212,14 @@ export default function UsersPage() {
     onError: (err) => {
       message.error(err instanceof Error ? err.message : `操作失败`);
     },
+    onFinally: () => {
+      setTogglingId(null);
+    },
   });
 
   const handleToggleDisable = (user: UserItem) => {
     const newStatus = user.status === "active" ? "disabled" : "active";
+    setTogglingId(user.id);
     toggleDisable(user.id, { status: newStatus });
   };
 
@@ -288,6 +293,7 @@ export default function UsersPage() {
               <Button
                 size="small"
                 danger={record.status === "active"}
+                loading={togglingId === record.id}
                 icon={
                   record.status === "active" ? (
                     <StopOutlined />
@@ -303,7 +309,7 @@ export default function UsersPage() {
         ),
       },
     ],
-    [openEdit, openResetPassword, handleToggleDisable],
+    [openEdit, openResetPassword, handleToggleDisable, togglingId],
   );
 
   return (

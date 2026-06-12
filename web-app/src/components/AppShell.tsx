@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
   Button,
   Layout,
   Popconfirm,
+  Skeleton,
   Spin,
   Typography,
   message,
@@ -63,7 +64,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   // ── qa sessions ──
-  const { data: qaSessions = [], run: loadQaSessions } = useApi<SessionItem[]>(
+  const { data: qaSessions = [], loading: sessionsLoading, run: loadQaSessions } = useApi<SessionItem[]>(
     "/qa/sessions",
     {
       refreshDeps: [!!user],
@@ -119,6 +120,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const isQaPage = selectedKey === "/qa";
+
+  // ── route transition progress bar ──
+  const [navigating, setNavigating] = useState(false);
+  const prevPathname = useRef(pathname);
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      setNavigating(true);
+      prevPathname.current = pathname;
+      const timer = setTimeout(() => setNavigating(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname]);
 
   // ── listen for external session updates ──
   useEffect(() => {
@@ -235,7 +248,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="app-sidebar-section-title">
               <span>历史会话</span>
             </div>
-            {qaSessions.length === 0 ? (
+            {sessionsLoading ? (
+              <div className="app-sidebar-session-list" style={{ padding: "0 8px" }}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton
+                    key={i}
+                    active
+                    paragraph={{ rows: 1, width: "70%" }}
+                    title={false}
+                    style={{ padding: "0 4px", marginBottom: 4 }}
+                  />
+                ))}
+              </div>
+            ) : qaSessions.length === 0 ? (
               <div className="app-sidebar-empty">暂无历史会话</div>
             ) : (
               <div className="app-sidebar-session-list">
@@ -312,6 +337,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           isQaPage ? "app-shell-content-qa" : ""
         }`}
       >
+        {/* Route transition progress bar */}
+        <div
+          className={`app-nav-progress ${navigating ? "app-nav-progress-active" : ""}`}
+        />
         <App>{children}</App>
       </Content>
     </Layout>

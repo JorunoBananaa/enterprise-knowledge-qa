@@ -12,6 +12,7 @@ import {
   Typography,
   Alert,
   Card,
+  Spin,
 } from "antd";
 import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
@@ -89,54 +90,58 @@ export default function UploadPage() {
       )}
 
       <Card>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={wrappedSubmit}
-          initialValues={{ category_id: "1" }}
-        >
-          <Form.Item
-            name="title"
-            label="标题"
-            rules={[{ required: true, message: "请输入文档标题" }]}
+        <Spin spinning={uploading} tip="正在上传并处理文档...">
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={wrappedSubmit}
+            initialValues={{ category_id: "1" }}
           >
-            <Input placeholder="请输入文档标题" />
-          </Form.Item>
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: "请输入文档标题" }]}
+            >
+              <Input placeholder="请输入文档标题" />
+            </Form.Item>
 
-          <Form.Item
-            name="category_id"
-            label="分类"
-            rules={[{ required: true, message: "请选择分类" }]}
-          >
-            <Select options={[{ label: "产品 A", value: "1" }]} />
-          </Form.Item>
+            <Form.Item
+              name="category_id"
+              label="分类"
+              rules={[{ required: true, message: "请选择分类" }]}
+            >
+              <Select options={[{ label: "产品 A", value: "1" }]} />
+            </Form.Item>
 
-          <Form.Item label="文件（支持 PDF、Word、PPT、Excel）">
-            <Dragger {...uploadProps}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-              <p className="ant-upload-hint">支持 PDF、Word、PPT、Excel 格式</p>
-            </Dragger>
-          </Form.Item>
+            <Form.Item label="文件（支持 PDF、Word、PPT、Excel）">
+              <Dragger {...uploadProps}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                <p className="ant-upload-hint">
+                  支持 PDF、Word、PPT、Excel 格式
+                </p>
+              </Dragger>
+            </Form.Item>
 
-          <Form.Item className="!mb-0">
-            <div className="flex gap-3">
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={uploading}
-                size="large"
-              >
-                {uploading ? "上传中..." : "上传到知识库"}
-              </Button>
-              <Button size="large" onClick={() => router.back()}>
-                取消
-              </Button>
-            </div>
-          </Form.Item>
-        </Form>
+            <Form.Item className="!mb-0">
+              <div className="flex gap-3">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={uploading}
+                  size="large"
+                >
+                  {uploading ? "上传中..." : "上传到知识库"}
+                </Button>
+                <Button size="large" onClick={() => router.back()}>
+                  取消
+                </Button>
+              </div>
+            </Form.Item>
+          </Form>
+        </Spin>
       </Card>
     </div>
   );

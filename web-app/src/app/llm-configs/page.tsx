@@ -120,6 +120,8 @@ export default function LLMConfigPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [activatingId, setActivatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
   const [form] = Form.useForm();
   const { message } = App.useApp();
@@ -229,8 +231,16 @@ export default function LLMConfigPage() {
       onError: (err) => {
         message.error(err instanceof Error ? err.message : "设置默认模型失败");
       },
+      onFinally: () => {
+        setActivatingId(null);
+      },
     },
   );
+
+  const doActivate = (id: number) => {
+    setActivatingId(id);
+    handleActivate(id);
+  };
 
   // ── test connectivity ──
   const { loading: testing, run: runTest } = useApi(
@@ -266,7 +276,15 @@ export default function LLMConfigPage() {
     onError: (err) => {
       message.error(err instanceof Error ? err.message : "删除失败");
     },
+    onFinally: () => {
+      setDeletingId(null);
+    },
   });
+
+  const doDelete = (id: number) => {
+    setDeletingId(id);
+    handleDelete(id);
+  };
 
   const columns = useMemo(
     () => [
@@ -374,7 +392,8 @@ export default function LLMConfigPage() {
                     type="default"
                     size="small"
                     icon={<ThunderboltOutlined />}
-                    onClick={() => handleActivate(record.id)}
+                    loading={activatingId === record.id}
+                    onClick={() => doActivate(record.id)}
                   >
                     设为默认
                   </Button>
@@ -391,12 +410,20 @@ export default function LLMConfigPage() {
               <Popconfirm
                 title="确定删除此配置？"
                 description="删除后不可恢复"
-                onConfirm={() => handleDelete(record.id)}
+                onConfirm={() => doDelete(record.id)}
                 okText="确定"
                 cancelText="取消"
-                okButtonProps={{ danger: true }}
+                okButtonProps={{
+                  danger: true,
+                  loading: deletingId === record.id,
+                }}
               >
-                <Button size="small" danger icon={<DeleteOutlined />} />
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  loading={deletingId === record.id}
+                />
               </Popconfirm>
             </Space>
           );
@@ -405,11 +432,13 @@ export default function LLMConfigPage() {
     ],
     [
       testingId,
+      activatingId,
+      deletingId,
       visibleKeys,
-      handleActivate,
+      doActivate,
       handleTest,
       openEdit,
-      handleDelete,
+      doDelete,
       toggleKeyVisibility,
     ],
   );

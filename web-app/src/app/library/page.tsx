@@ -10,7 +10,7 @@ import {
   Typography,
   Card,
   Empty,
-  Spin,
+  Skeleton,
 } from "antd";
 import { PlusOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
@@ -144,9 +144,9 @@ export default function LibraryPage() {
       </Card>
 
       {loading ? (
-        <Spin spinning>
-          <div style={{ minHeight: 200 }} />
-        </Spin>
+        <Card>
+          <Skeleton active paragraph={{ rows: 8 }} />
+        </Card>
       ) : docs.length === 0 ? (
         <Empty description="暂无文档，请上传文档开始使用" />
       ) : (

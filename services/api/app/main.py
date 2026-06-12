@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 import app.models  # noqa: F401  # register all models with Base.metadata
 from app.api.routes.auth import router as auth_router
@@ -17,6 +18,10 @@ from app.db.session import SessionLocal, engine
 
 def _seed_database() -> None:
     """Create tables and seed MVP users + default category if missing."""
+    # Enable pgvector extension before creating tables that depend on VECTOR type
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
@@ -30,7 +35,7 @@ def _seed_database() -> None:
             db.add(User(
                 username="admin",
                 display_name="Administrator",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password("a"),
                 role=UserRole.ADMIN,
                 status=UserStatus.ACTIVE,
                 token_version=0,
@@ -39,7 +44,7 @@ def _seed_database() -> None:
             db.add(User(
                 username="user",
                 display_name="Standard User",
-                password_hash=hash_password("user123"),
+                password_hash=hash_password("a"),
                 role=UserRole.STANDARD,
                 status=UserStatus.ACTIVE,
                 token_version=0,

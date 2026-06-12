@@ -10,7 +10,7 @@ from pydantic import BaseModel
 class AskRequest(BaseModel):
     question: str
     session_id: int | None = None  # None → create a new session
-    llm_config_id: int | None = None  # None → use active config; -1 → fake mode
+    llm_config_id: int | None = None  # None → use active config
 
 
 class CitationItem(BaseModel):
