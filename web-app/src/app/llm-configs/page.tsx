@@ -38,8 +38,9 @@ import {
 } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
 import { omit, maskString } from "@/lib/utils";
+import PageHeader from "@/components/PageHeader";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
 
 interface LLMConfigItem {
@@ -445,29 +446,22 @@ export default function LLMConfigPage() {
 
   return (
     <div className="max-w-[1060px] mx-auto space-y-5">
-      {/* ── 页头 ── */}
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            LLM CONFIGS
-          </div>
-          <Title level={3} className="!mb-1">
-            <RobotOutlined className="mr-2 text-zinc-700" />
-            大模型管理
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
-            管理 DeepSeek、OpenAI 等大模型供应商的 API 配置，支持多配置切换
-          </p>
-        </div>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={openCreate}
-        >
-          添加配置
-        </Button>
-      </div>
+      <PageHeader
+        label="LLM CONFIGS"
+        icon={<RobotOutlined />}
+        title="大模型管理"
+        description="管理 DeepSeek、OpenAI 等大模型供应商的 API 配置，支持多配置切换"
+        actions={
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={openCreate}
+          >
+            添加配置
+          </Button>
+        }
+      />
 
       {/* ── 统计卡片 ── */}
       <Row gutter={16}>

@@ -2,22 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Table,
-  Button,
-  Select,
-  Space,
-  Typography,
-  Card,
-  Empty,
-  Skeleton,
-} from "antd";
+import { Table, Button, Select, Space, Card, Empty, Skeleton } from "antd";
 import { PlusOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { useApi } from "@/lib/use-api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
-
-const { Title } = Typography;
+import PageHeader from "@/components/PageHeader";
 
 interface Document {
   id: number;
@@ -93,25 +83,19 @@ export default function LibraryPage() {
 
   return (
     <div className="max-w-[1060px] mx-auto">
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            KNOWLEDGE BASE
-          </div>
-          <Title level={3} className="!mb-1">
-            <BookOutlined className="mr-2 text-zinc-700" />
-            知识库
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
-            管理企业知识文档，上传后经审核即可加入检索索引
-          </p>
-        </div>
-        <Link href="/library/upload">
-          <Button type="primary" size="large" icon={<PlusOutlined />}>
-            上传文档
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        label="KNOWLEDGE BASE"
+        icon={<BookOutlined />}
+        title="知识库"
+        description="管理企业知识文档，上传后经审核即可加入检索索引"
+        actions={
+          <Link href="/library/upload">
+            <Button type="primary" size="large" icon={<PlusOutlined />}>
+              上传文档
+            </Button>
+          </Link>
+        }
+      />
 
       <Card className="!mb-4">
         <Space wrap>

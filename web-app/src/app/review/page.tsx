@@ -5,8 +5,9 @@ import { List, Button, Card, Space, Typography, Spin, Empty, App } from "antd";
 import { CheckOutlined, CloseOutlined, AuditOutlined } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
+import PageHeader from "@/components/PageHeader";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface Document {
   id: number;
@@ -79,20 +80,12 @@ export default function ReviewPage() {
 
   return (
     <div className="max-w-[1060px] mx-auto">
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            REVIEW
-          </div>
-          <Title level={3} className="!mb-1">
-            <AuditOutlined className="mr-2 text-zinc-700" />
-            审核队列
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
-            审批待审核的文档，通过后自动加入检索索引
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        label="REVIEW"
+        icon={<AuditOutlined />}
+        title="审核队列"
+        description="审批待审核的文档，通过后自动加入检索索引"
+      />
 
       <Card>
         <Spin spinning={loading}>

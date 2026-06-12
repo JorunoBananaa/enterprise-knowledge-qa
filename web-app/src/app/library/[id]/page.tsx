@@ -2,14 +2,12 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Descriptions, Card, Typography, Spin, Alert } from "antd";
+import { Descriptions, Card, Alert } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
-import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
-
-const { Title } = Typography;
+import PageHeader from "@/components/PageHeader";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Document {
   id: number;
@@ -32,12 +30,7 @@ export default function DocumentDetailPage() {
 
   const doc = docsData?.items.find((d) => d.id === Number(params.id)) || null;
 
-  if (loading)
-    return (
-      <div className="flex justify-center py-20">
-        <Spin size="large" />
-      </div>
-    );
+  if (loading) return <LoadingSpinner />;
   if (!doc) return <Alert message="文档未找到" type="warning" showIcon />;
 
   return (
@@ -50,19 +43,15 @@ export default function DocumentDetailPage() {
         返回知识库
       </Link>
 
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            DOCUMENT DETAIL
-          </div>
-          <Title level={3} className="!mb-1">
-            {doc.title}
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
+      <PageHeader
+        label="DOCUMENT DETAIL"
+        title={doc.title}
+        description={
+          <>
             {doc.file_type} · 上传者 #{doc.uploader_id}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <Card>
         <Descriptions column={2} bordered size="small">

@@ -13,7 +13,6 @@ import {
   Table,
   Tag,
   Tooltip,
-  Typography,
   App,
 } from "antd";
 import {
@@ -27,8 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
 import { debounce } from "@/lib/utils";
-
-const { Title } = Typography;
+import PageHeader from "@/components/PageHeader";
 
 interface UserItem {
   id: number;
@@ -314,31 +312,25 @@ export default function UsersPage() {
 
   return (
     <div className="max-w-[1060px] mx-auto">
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            USERS
-          </div>
-          <Title level={3} className="!mb-1">
-            <TeamOutlined className="mr-2 text-zinc-700" />
-            用户管理
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
-            管理系统用户账号、角色权限与状态
-          </p>
-        </div>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            createForm.resetFields();
-            setCreateOpen(true);
-          }}
-        >
-          新建用户
-        </Button>
-      </div>
+      <PageHeader
+        label="USERS"
+        icon={<TeamOutlined />}
+        title="用户管理"
+        description="管理系统用户账号、角色权限与状态"
+        actions={
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              createForm.resetFields();
+              setCreateOpen(true);
+            }}
+          >
+            新建用户
+          </Button>
+        }
+      />
 
       <Card className="!mb-4">
         <Space>

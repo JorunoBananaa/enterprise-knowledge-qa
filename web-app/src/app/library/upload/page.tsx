@@ -3,22 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Form,
-  Input,
-  Select,
-  Button,
-  Upload,
-  Typography,
-  Alert,
-  Card,
-  Spin,
-} from "antd";
+import { Form, Input, Select, Button, Upload, Alert, Card, Spin } from "antd";
 import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import { useApi } from "@/lib/use-api";
+import PageHeader from "@/components/PageHeader";
 
-const { Title } = Typography;
 const { Dragger } = Upload;
 
 export default function UploadPage() {
@@ -73,19 +63,11 @@ export default function UploadPage() {
         返回知识库
       </Link>
 
-      <div className="flex items-start justify-between gap-4 mb-[18px]">
-        <div>
-          <div className="mb-1.5 text-app-muted text-xs font-bold tracking-normal">
-            UPLOAD
-          </div>
-          <Title level={3} className="!mb-1">
-            上传文档
-          </Title>
-          <p className="!mb-0 text-app-muted text-sm leading-[1.7]">
-            上传 PDF、Word、PPT、Excel 文件到知识库，提交后将进入审核流程
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        label="UPLOAD"
+        title="上传文档"
+        description="上传 PDF、Word、PPT、Excel 文件到知识库，提交后将进入审核流程"
+      />
 
       {errorMessage && (
         <Alert message={errorMessage} type="error" showIcon className="!mb-4" />
