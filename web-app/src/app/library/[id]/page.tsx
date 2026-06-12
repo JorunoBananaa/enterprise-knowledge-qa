@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Descriptions, Card, Typography, Spin, Alert } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 
@@ -36,12 +38,34 @@ export default function DocumentDetailPage() {
   }, [params.id]);
 
   if (loading)
-    return <Spin tip="加载中..." style={{ display: "block", padding: 48 }} />;
+    return (
+      <div className="flex justify-center py-20">
+        <Spin size="large" />
+      </div>
+    );
   if (!doc) return <Alert message="文档未找到" type="warning" showIcon />;
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <Title level={3}>{doc.title}</Title>
+    <div className="max-w-[800px] mx-auto">
+      <Link
+        href="/library"
+        className="inline-flex items-center gap-1.5 mb-4 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+      >
+        <ArrowLeftOutlined />
+        返回知识库
+      </Link>
+
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">DOCUMENT DETAIL</div>
+          <Title level={3} className="!mb-1">
+            {doc.title}
+          </Title>
+          <p className="page-description !mb-0">
+            {doc.file_type} · 上传者 #{doc.uploader_id}
+          </p>
+        </div>
+      </div>
 
       <Card>
         <Descriptions column={2} bordered size="small">
@@ -68,7 +92,7 @@ export default function DocumentDetailPage() {
             description={doc.failure_reason}
             type="error"
             showIcon
-            style={{ marginTop: 16 }}
+            className="!mt-4"
           />
         )}
       </Card>

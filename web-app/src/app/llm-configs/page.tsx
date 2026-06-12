@@ -38,7 +38,7 @@ import {
 } from "@ant-design/icons";
 import { apiFetch } from "@/lib/api";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 interface LLMConfigItem {
@@ -388,15 +388,16 @@ export default function LLMConfigPage() {
   return (
     <div className="max-w-[1060px] mx-auto space-y-5">
       {/* ── 页头 ── */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
+          <div className="page-eyebrow">LLM CONFIGS</div>
           <Title level={3} className="!mb-1">
-            <RobotOutlined className="mr-2 text-blue-500" />
+            <RobotOutlined className="mr-2 text-zinc-700" />
             大模型管理
           </Title>
-          <Paragraph type="secondary" className="!mb-0 text-sm">
+          <p className="page-description !mb-0">
             管理 DeepSeek、OpenAI 等大模型供应商的 API 配置，支持多配置切换
-          </Paragraph>
+          </p>
         </div>
         <Button
           type="primary"

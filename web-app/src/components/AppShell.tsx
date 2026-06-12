@@ -1,30 +1,50 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layout, Menu, Button, Space, Typography, App, Spin } from "antd";
 import {
-  BookOutlined,
-  QuestionCircleOutlined,
+  App,
+  Button,
+  Layout,
+  Popconfirm,
+  Spin,
+  Typography,
+  message,
+} from "antd";
+import {
   AuditOutlined,
+  BookOutlined,
+  FileTextOutlined,
+  DeleteOutlined,
+  LogoutOutlined,
+  PlusSquareOutlined,
+  QuestionCircleOutlined,
+  RobotOutlined,
   TeamOutlined,
   UserOutlined,
-  LogoutOutlined,
-  FileTextOutlined,
-  RobotOutlined,
 } from "@ant-design/icons";
+import { apiFetch } from "@/lib/api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
 import type { CurrentUser } from "@/lib/auth-client";
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 const { Text } = Typography;
+
+interface SessionItem {
+  id: number;
+  title: string | null;
+  created_at: string;
+  message_count: number;
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [qaSessions, setQaSessions] = useState<SessionItem[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (pathname === "/login") {
@@ -42,6 +62,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         router.replace(buildLoginUrl(pathname));
       });
   }, [pathname, router]);
+
+  const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await apiFetch(`/qa/sessions/${id}`, { method: "DELETE" });
+      message.success("会话已删除");
+      if (currentSessionId === String(id)) {
+        setCurrentSessionId(null);
+        router.push("/qa");
+      }
+      loadQaSessions();
+      window.dispatchEvent(new Event("qa:sessions-updated"));
+    } catch {
+      message.error("删除会话失败");
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -63,49 +100,93 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return "/qa";
   }, [pathname]);
 
-  const menuItems = useMemo(() => {
-    const items: any[] = [
-      {
-        key: "/qa",
-        icon: <QuestionCircleOutlined />,
-        label: (
-          <Link
-            href="/qa"
-            style={{ fontSize: 18, fontWeight: 700, whiteSpace: "nowrap" }}
-          >
-            企业知识问答
-          </Link>
-        ),
-      },
+  const isQaPage = selectedKey === "/qa";
+
+  useEffect(() => {
+    const syncSessionId = () => {
+      setCurrentSessionId(
+        new URLSearchParams(window.location.search).get("session_id"),
+      );
+    };
+    const handleSessionSelected = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: number | null }>)
+        .detail;
+      if (detail && "sessionId" in detail) {
+        setCurrentSessionId(
+          detail.sessionId === null || detail.sessionId === undefined
+            ? null
+            : String(detail.sessionId),
+        );
+        return;
+      }
+      syncSessionId();
+    };
+
+    syncSessionId();
+    window.addEventListener("popstate", syncSessionId);
+    window.addEventListener("qa:session-selected", handleSessionSelected);
+    return () => {
+      window.removeEventListener("popstate", syncSessionId);
+      window.removeEventListener("qa:session-selected", handleSessionSelected);
+    };
+  }, [pathname]);
+
+  const loadQaSessions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await apiFetch<SessionItem[]>("/qa/sessions");
+      setQaSessions(data);
+    } catch {
+      // The shell should stay usable even when the session list cannot load.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadQaSessions();
+  }, [loadQaSessions, currentSessionId]);
+
+  useEffect(() => {
+    window.addEventListener("qa:sessions-updated", loadQaSessions);
+    return () => {
+      window.removeEventListener("qa:sessions-updated", loadQaSessions);
+    };
+  }, [loadQaSessions]);
+
+  const navItems = useMemo(() => {
+    const items = [
       {
         key: "/library",
-        icon: <BookOutlined />,
-        label: <Link href="/library">知识库</Link>,
+        href: "/library",
+        icon: BookOutlined,
+        label: "知识库管理",
       },
       {
         key: "/prompts",
-        icon: <FileTextOutlined />,
-        label: <Link href="/prompts">提示词</Link>,
+        href: "/prompts",
+        icon: FileTextOutlined,
+        label: "提示词",
       },
     ];
 
     if (user?.role === "admin") {
       items.push(
-        { type: "divider" as const },
         {
           key: "/llm-configs",
-          icon: <RobotOutlined />,
-          label: <Link href="/llm-configs">大模型管理</Link>,
+          href: "/llm-configs",
+          icon: RobotOutlined,
+          label: "大模型管理",
         },
         {
           key: "/review",
-          icon: <AuditOutlined />,
-          label: <Link href="/review">审核管理</Link>,
+          href: "/review",
+          icon: AuditOutlined,
+          label: "审核管理",
         },
         {
           key: "/users",
-          icon: <TeamOutlined />,
-          label: <Link href="/users">用户管理</Link>,
+          href: "/users",
+          icon: TeamOutlined,
+          label: "用户管理",
         },
       );
     }
@@ -137,42 +218,132 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 24px",
-          background: "#001529",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
-          <Menu
-            theme="dark"
-            mode="horizontal"
-            selectedKeys={[selectedKey]}
-            items={menuItems}
-            style={{ flex: 1, minWidth: 0 }}
-          />
+    <Layout className="app-shell">
+      <aside className="app-sidebar">
+        <div className="app-sidebar-top">
+          <Link href="/qa" className="app-shell-brand">
+            <span className="app-shell-brand-icon">
+              <BookOutlined />
+            </span>
+            <span className="app-shell-brand-copy">
+              <span className="app-shell-brand-title">知识中枢</span>
+              <span className="app-shell-brand-subtitle">企业知识库助手</span>
+            </span>
+          </Link>
+
+          <Link
+            href="/qa"
+            className="app-sidebar-new"
+            onClick={() => setCurrentSessionId(null)}
+          >
+            <PlusSquareOutlined />
+            <span>新建问答</span>
+          </Link>
+
+          <nav className="app-sidebar-nav" aria-label="主导航">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = selectedKey === item.key;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className={`app-sidebar-nav-item ${
+                    active ? "app-sidebar-nav-item-active" : ""
+                  }`}
+                >
+                  <Icon />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="app-sidebar-history">
+            <div className="app-sidebar-section-title">
+              <span>历史会话</span>
+              <QuestionCircleOutlined />
+            </div>
+            {qaSessions.length === 0 ? (
+              <div className="app-sidebar-empty">暂无历史会话</div>
+            ) : (
+              <div className="app-sidebar-session-list">
+                {qaSessions.map((session) => {
+                  const active = currentSessionId === String(session.id);
+                  return (
+                    <div
+                      key={session.id}
+                      className={`app-sidebar-session ${
+                        active ? "app-sidebar-session-active" : ""
+                      }`}
+                    >
+                      <Link
+                        href={`/qa?session_id=${session.id}`}
+                        onClick={() => setCurrentSessionId(String(session.id))}
+                        className="app-sidebar-session-link"
+                      >
+                        <span className="app-sidebar-session-title">
+                          {session.title || "新会话"}
+                        </span>
+                      </Link>
+                      <Popconfirm
+                        title="确定删除此会话？"
+                        description="删除后不可恢复"
+                        onConfirm={(e) =>
+                          handleDeleteSession(
+                            session.id,
+                            e as unknown as React.MouseEvent,
+                          )
+                        }
+                        onCancel={(e) => {
+                          (e as React.MouseEvent).stopPropagation();
+                        }}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <button
+                          type="button"
+                          className="app-sidebar-session-delete"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="删除会话"
+                        >
+                          <DeleteOutlined />
+                        </button>
+                      </Popconfirm>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-        <Space>
-          <Text style={{ color: "rgba(255,255,255,0.65)" }}>
-            <UserOutlined /> {user.display_name || user.username}
-          </Text>
+
+        <div className="app-sidebar-user">
+          <span className="app-sidebar-avatar">
+            {(user.display_name || user.username).slice(0, 1).toUpperCase()}
+          </span>
+          <span className="app-sidebar-user-copy">
+            <Text ellipsis className="app-sidebar-user-name">
+              {user.display_name || user.username}
+            </Text>
+            <span className="app-sidebar-user-role">
+              {user.role === "admin" ? "管理员" : "知识库成员"}
+            </span>
+          </span>
           <Button
             type="text"
             icon={<LogoutOutlined />}
             onClick={handleLogout}
-            style={{ color: "rgba(255,255,255,0.85)" }}
-          >
-            退出登录
-          </Button>
-        </Space>
-      </Header>
+            aria-label="退出登录"
+          />
+        </div>
+      </aside>
+
       <Content
-        style={{ padding: 24, maxWidth: 1200, margin: "0 auto", width: "100%" }}
+        className={`app-shell-content ${
+          isQaPage ? "app-shell-content-qa" : ""
+        }`}
       >
         <App>{children}</App>
       </Content>

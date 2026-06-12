@@ -43,23 +43,25 @@ function SystemPromptPanel() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Spin tip="加载中..." />
+        <Spin />
       </div>
     );
   }
 
   return (
     <div>
-      <Paragraph type="secondary" className="!mb-4">
+      <div className="prompt-panel-intro">
+        <Paragraph type="secondary" className="!mb-0">
         系统提示词定义了回答的基础规则，对所有问答生效。
-      </Paragraph>
+        </Paragraph>
+      </div>
 
-      <Card>
+      <Card className="prompt-editor-card">
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Form.Item name="content" label="提示词内容">
-            <TextArea rows={6} placeholder="请输入系统提示词内容，可为空..." />
+            <TextArea rows={8} placeholder="请输入系统提示词内容，可为空..." />
           </Form.Item>
-          <Form.Item className="!mb-0">
+          <Form.Item className="!mb-0 text-right">
             <Button type="primary" htmlType="submit" loading={saving}>
               {saving ? "保存中..." : "保存"}
             </Button>
@@ -105,26 +107,28 @@ function PersonalPromptPanel() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Spin tip="加载中..." />
+        <Spin />
       </div>
     );
   }
 
   return (
     <div>
-      <Paragraph type="secondary" className="!mb-4">
+      <div className="prompt-panel-intro">
+        <Paragraph type="secondary" className="!mb-0">
         自定义回答的风格和格式，仅对你本人可见。
-      </Paragraph>
+        </Paragraph>
+      </div>
 
-      <Card>
+      <Card className="prompt-editor-card">
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Form.Item name="content" label="提示词内容">
             <TextArea
-              rows={6}
+              rows={8}
               placeholder="自定义回答的风格和格式，可为空..."
             />
           </Form.Item>
-          <Form.Item className="!mb-0">
+          <Form.Item className="!mb-0 text-right">
             <Button type="primary" htmlType="submit" loading={saving}>
               {saving ? "保存中..." : "保存"}
             </Button>
@@ -187,20 +191,24 @@ export default function PromptsPage() {
   }
 
   return (
-    <div className="max-w-[780px] mx-auto">
-      <div className="mb-5">
-        <Title level={3} className="!mb-1">
-          <FileTextOutlined className="mr-2 text-blue-500" />
-          提示词管理
-        </Title>
-        <Paragraph type="secondary" className="!mb-0 text-sm">
-          {isAdmin
-            ? "管理系统全局提示词与个人自定义提示词"
-            : "自定义问答风格，让你的回答更符合个人偏好"}
-        </Paragraph>
+    <div className="prompt-page">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">PROMPTS</div>
+          <Title level={3} className="!mb-1">
+            <FileTextOutlined className="mr-2 text-zinc-700" />
+            提示词管理
+          </Title>
+          <Paragraph type="secondary" className="!mb-0 page-description">
+            {isAdmin
+              ? "管理系统全局提示词与个人自定义提示词"
+              : "自定义问答风格，让你的回答更符合个人偏好"}
+          </Paragraph>
+        </div>
       </div>
 
       <Tabs
+        className="prompt-tabs"
         defaultActiveKey={isAdmin ? "system" : "personal"}
         items={tabItems}
         size="large"

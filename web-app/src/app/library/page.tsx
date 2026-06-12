@@ -12,7 +12,7 @@ import {
   Empty,
   Spin,
 } from "antd";
-import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
@@ -102,26 +102,26 @@ export default function LibraryPage() {
   }, []);
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Title level={3} style={{ margin: 0 }}>
-          知识库
-        </Title>
+    <div className="max-w-[1060px] mx-auto">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">KNOWLEDGE BASE</div>
+          <Title level={3} className="!mb-1">
+            <BookOutlined className="mr-2 text-zinc-700" />
+            知识库
+          </Title>
+          <p className="page-description !mb-0">
+            管理企业知识文档，上传后经审核即可加入检索索引
+          </p>
+        </div>
         <Link href="/library/upload">
-          <Button type="primary" icon={<PlusOutlined />}>
+          <Button type="primary" size="large" icon={<PlusOutlined />}>
             上传文档
           </Button>
         </Link>
       </div>
 
-      <Card style={{ marginBottom: 16 }}>
+      <Card className="!mb-4">
         <Space wrap>
           <Select
             placeholder="选择分类"

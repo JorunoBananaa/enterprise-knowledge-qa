@@ -23,8 +23,21 @@ export default function RootLayout({
             locale={zhCN}
             theme={{
               token: {
-                colorPrimary: "#4f46e5",
+                colorPrimary: "#171717",
+                colorBgBase: "#f8fafc",
+                colorBgLayout: "#f8fafc",
+                colorBgContainer: "#ffffff",
+                colorBorder: "#e5e7eb",
+                colorBorderSecondary: "#eef2f7",
+                colorText: "#1f2937",
+                colorTextSecondary: "#64748b",
+                colorTextTertiary: "#94a3b8",
                 borderRadius: 8,
+                borderRadiusLG: 8,
+                controlHeight: 36,
+                fontSize: 14,
+                controlItemBgActive: "#f4f4f5",
+                controlItemBgHover: "#f8fafc",
               },
             }}
           >

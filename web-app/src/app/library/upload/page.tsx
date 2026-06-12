@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Form,
   Input,
@@ -12,7 +13,7 @@ import {
   Alert,
   Card,
 } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import { apiFetch } from "@/lib/api";
 
@@ -63,16 +64,29 @@ export default function UploadPage() {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <Title level={3}>上传文档</Title>
+    <div className="max-w-[680px] mx-auto">
+      <Link
+        href="/library"
+        className="inline-flex items-center gap-1.5 mb-4 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+      >
+        <ArrowLeftOutlined />
+        返回知识库
+      </Link>
+
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">UPLOAD</div>
+          <Title level={3} className="!mb-1">
+            上传文档
+          </Title>
+          <p className="page-description !mb-0">
+            上传 PDF、Word、PPT、Excel 文件到知识库，提交后将进入审核流程
+          </p>
+        </div>
+      </div>
 
       {error && (
-        <Alert
-          message={error}
-          type="error"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
+        <Alert message={error} type="error" showIcon className="!mb-4" />
       )}
 
       <Card>
@@ -108,12 +122,19 @@ export default function UploadPage() {
             </Dragger>
           </Form.Item>
 
-          <Form.Item>
-            <div style={{ display: "flex", gap: 12 }}>
-              <Button type="primary" htmlType="submit" loading={uploading}>
-                {uploading ? "上传中..." : "上传"}
+          <Form.Item className="!mb-0">
+            <div className="flex gap-3">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={uploading}
+                size="large"
+              >
+                {uploading ? "上传中..." : "上传到知识库"}
               </Button>
-              <Button onClick={() => router.back()}>取消</Button>
+              <Button size="large" onClick={() => router.back()}>
+                取消
+              </Button>
             </div>
           </Form.Item>
         </Form>

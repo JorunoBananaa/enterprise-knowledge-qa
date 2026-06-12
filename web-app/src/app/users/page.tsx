@@ -76,7 +76,7 @@ export default function UsersPage() {
 
   // ── debounce search ───────────────────────────────────────────
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -274,54 +274,59 @@ export default function UsersPage() {
   ];
 
   return (
-    <div className="max-w-[960px] mx-auto">
-      <div className="mb-5">
-        <Title level={3} className="!mb-1">
-          <TeamOutlined className="mr-2 text-blue-500" />
-          用户管理
-        </Title>
+    <div className="max-w-[1060px] mx-auto">
+      <div className="page-header">
+        <div>
+          <div className="page-eyebrow">USERS</div>
+          <Title level={3} className="!mb-1">
+            <TeamOutlined className="mr-2 text-zinc-700" />
+            用户管理
+          </Title>
+          <p className="page-description !mb-0">
+            管理系统用户账号、角色权限与状态
+          </p>
+        </div>
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            createForm.resetFields();
+            setCreateOpen(true);
+          }}
+        >
+          新建用户
+        </Button>
       </div>
 
-      <Card>
-        <div className="flex justify-between mb-4">
-          <Input
-            placeholder="搜索用户名或显示名称"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 300 }}
-            allowClear
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              createForm.resetFields();
-              setCreateOpen(true);
-            }}
-          >
-            新建用户
-          </Button>
-        </div>
-
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: Math.floor(pagination.offset / pagination.limit) + 1,
-            pageSize: pagination.limit,
-            total,
-            onChange: (page, pageSize) => {
-              setPagination({
-                offset: (page - 1) * pageSize,
-                limit: pageSize,
-              });
-            },
-            showTotal: (t) => `共 ${t} 名用户`,
-          }}
+      <Card className="!mb-4">
+        <Input
+          placeholder="搜索用户名或显示名称"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 300 }}
+          allowClear
         />
       </Card>
+
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey="id"
+        loading={loading}
+        pagination={{
+          current: Math.floor(pagination.offset / pagination.limit) + 1,
+          pageSize: pagination.limit,
+          total,
+          onChange: (page, pageSize) => {
+            setPagination({
+              offset: (page - 1) * pageSize,
+              limit: pageSize,
+            });
+          },
+          showTotal: (t) => `共 ${t} 名用户`,
+        }}
+      />
 
       {/* Create Modal */}
       <Modal
@@ -330,7 +335,8 @@ export default function UsersPage() {
         onCancel={() => setCreateOpen(false)}
         onOk={() => createForm.submit()}
         confirmLoading={submitting}
-        destroyOnClose
+        destroyOnHidden
+        forceRender
       >
         <Form
           form={createForm}
@@ -380,7 +386,8 @@ export default function UsersPage() {
         onCancel={() => setEditUser(null)}
         onOk={() => editForm.submit()}
         confirmLoading={submitting}
-        destroyOnClose
+        destroyOnHidden
+        forceRender
       >
         <Form form={editForm} layout="vertical" onFinish={handleEdit}>
           <Form.Item name="display_name" label="显示名称">
@@ -412,7 +419,8 @@ export default function UsersPage() {
         onCancel={() => setResetPasswordUser(null)}
         onOk={() => pwdForm.submit()}
         confirmLoading={submitting}
-        destroyOnClose
+        destroyOnHidden
+        forceRender
       >
         <Form form={pwdForm} layout="vertical" onFinish={handleResetPassword}>
           <Form.Item
