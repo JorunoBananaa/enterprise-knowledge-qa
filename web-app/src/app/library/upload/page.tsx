@@ -15,9 +15,7 @@ import {
 } from "antd";
 import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
-import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
-import { apiFetch } from "@/lib/api";
 
 const { Title } = Typography;
 const { Dragger } = Upload;

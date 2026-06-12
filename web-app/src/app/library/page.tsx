@@ -14,9 +14,7 @@ import {
 } from "antd";
 import { PlusOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
-import { apiFetch } from "@/lib/api";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 
 const { Title } = Typography;

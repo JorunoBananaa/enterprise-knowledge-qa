@@ -26,7 +26,6 @@ import {
 } from "@ant-design/icons";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
-import { apiFetch } from "@/lib/api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
 import type { CurrentUser } from "@/lib/auth-client";
 

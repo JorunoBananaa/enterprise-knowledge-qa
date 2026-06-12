@@ -25,10 +25,8 @@ import {
   TeamOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { debounce } from "@/lib/utils";
-import { apiFetch } from "@/lib/api";
 
 const { Title } = Typography;
 
@@ -220,90 +218,93 @@ export default function UsersPage() {
     toggleDisable(user.id, { status: newStatus });
   };
 
-  const columns = [
-    {
-      title: "用户名",
-      dataIndex: "username",
-      key: "username",
-    },
-    {
-      title: "显示名称",
-      dataIndex: "display_name",
-      key: "display_name",
-    },
-    {
-      title: "角色",
-      dataIndex: "role",
-      key: "role",
-      render: (role: string) => (
-        <Tag color={roleColor(role)}>{roleLabel(role)}</Tag>
-      ),
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      key: "status",
-      render: (status: string) => (
-        <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
-      ),
-    },
-    {
-      title: "操作",
-      key: "actions",
-      width: 280,
-      render: (_: unknown, record: UserItem) => (
-        <Space size={4}>
-          <Tooltip title="编辑用户信息与角色">
-            <Button
-              type="default"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openEdit(record)}
-            >
-              编辑
-            </Button>
-          </Tooltip>
-          <Tooltip title="为该用户重置登录密码">
-            <Button
-              type="default"
-              size="small"
-              icon={<KeyOutlined />}
-              onClick={() => openResetPassword(record)}
-            >
-              重置密码
-            </Button>
-          </Tooltip>
-          <Popconfirm
-            title={
-              record.status === "active"
-                ? `确定要禁用用户"${record.display_name}"吗？`
-                : `确定要启用用户"${record.display_name}"吗？`
-            }
-            onConfirm={() => handleToggleDisable(record)}
-            okText="确定"
-            cancelText="取消"
-            okButtonProps={{
-              danger: record.status === "active",
-            }}
-          >
-            <Button
-              size="small"
-              danger={record.status === "active"}
-              icon={
-                record.status === "active" ? (
-                  <StopOutlined />
-                ) : (
-                  <CheckOutlined />
-                )
+  const columns = useMemo(
+    () => [
+      {
+        title: "用户名",
+        dataIndex: "username",
+        key: "username",
+      },
+      {
+        title: "显示名称",
+        dataIndex: "display_name",
+        key: "display_name",
+      },
+      {
+        title: "角色",
+        dataIndex: "role",
+        key: "role",
+        render: (role: string) => (
+          <Tag color={roleColor(role)}>{roleLabel(role)}</Tag>
+        ),
+      },
+      {
+        title: "状态",
+        dataIndex: "status",
+        key: "status",
+        render: (status: string) => (
+          <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
+        ),
+      },
+      {
+        title: "操作",
+        key: "actions",
+        width: 280,
+        render: (_: unknown, record: UserItem) => (
+          <Space size={4}>
+            <Tooltip title="编辑用户信息与角色">
+              <Button
+                type="default"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEdit(record)}
+              >
+                编辑
+              </Button>
+            </Tooltip>
+            <Tooltip title="为该用户重置登录密码">
+              <Button
+                type="default"
+                size="small"
+                icon={<KeyOutlined />}
+                onClick={() => openResetPassword(record)}
+              >
+                重置密码
+              </Button>
+            </Tooltip>
+            <Popconfirm
+              title={
+                record.status === "active"
+                  ? `确定要禁用用户"${record.display_name}"吗？`
+                  : `确定要启用用户"${record.display_name}"吗？`
               }
+              onConfirm={() => handleToggleDisable(record)}
+              okText="确定"
+              cancelText="取消"
+              okButtonProps={{
+                danger: record.status === "active",
+              }}
             >
-              {record.status === "active" ? "禁用" : "启用"}
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+              <Button
+                size="small"
+                danger={record.status === "active"}
+                icon={
+                  record.status === "active" ? (
+                    <StopOutlined />
+                  ) : (
+                    <CheckOutlined />
+                  )
+                }
+              >
+                {record.status === "active" ? "禁用" : "启用"}
+              </Button>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ],
+    [openEdit, openResetPassword, handleToggleDisable],
+  );
 
   return (
     <div className="max-w-[1060px] mx-auto">

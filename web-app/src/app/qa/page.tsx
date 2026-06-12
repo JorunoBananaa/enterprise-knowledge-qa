@@ -261,8 +261,13 @@ function QAPageContent() {
 
   // ── derived state ────────────────────────────────────────────────
 
+  const sessionMap = useMemo(
+    () => new Map(sessions.map((s): [number, SessionItem] => [s.id, s])),
+    [sessions],
+  );
+
   const activeSessionTitle = activeId
-    ? sessions.find((s) => s.id === activeId)?.title || "新会话"
+    ? sessionMap.get(activeId)?.title || "新会话"
     : "向知识库提问";
 
   // ── render ───────────────────────────────────────────────────────

@@ -109,6 +109,13 @@ const PROVIDER_TAG_COLORS: Record<string, string> = {
   moonshot: "geekblue",
 };
 
+/** 新建配置默认值 — 提升到模块作用域避免每次渲染重建 */
+const DEFAULT_FORM_VALUES = {
+  provider: "deepseek" as string,
+  model_name: "deepseek-chat",
+  base_url: "https://api.deepseek.com/v1",
+};
+
 export default function LLMConfigPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -132,11 +139,7 @@ export default function LLMConfigPage() {
   const openCreate = () => {
     setEditingId(null);
     form.resetFields();
-    form.setFieldsValue({
-      provider: "deepseek",
-      model_name: "deepseek-chat",
-      base_url: "https://api.deepseek.com/v1",
-    });
+    form.setFieldsValue(DEFAULT_FORM_VALUES);
     setModalOpen(true);
   };
 
@@ -264,140 +267,151 @@ export default function LLMConfigPage() {
     },
   });
 
-  const columns = [
-    {
-      title: "配置名称",
-      dataIndex: "name",
-      key: "name",
-      width: 200,
-      ellipsis: true,
-      render: (name: string, record: LLMConfigItem) => (
-        <Tooltip title={name}>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-medium truncate">{name}</span>
-            {record.is_active && (
-              <Tag
-                color="success"
-                icon={<CheckCircleOutlined />}
-                className="!m-0 shrink-0"
-              >
-                默认
-              </Tag>
-            )}
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: "供应商",
-      dataIndex: "provider",
-      key: "provider",
-      width: 120,
-      ellipsis: true,
-      render: (p: string) => {
-        const meta = PROVIDER_META[p];
-        return (
-          <Tag color={PROVIDER_TAG_COLORS[p] || "default"}>
-            {meta ? (
-              <span className="inline-flex items-center gap-1">
-                <span
-                  className="inline-block w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: meta.color }}
-                />
-                {meta.label}
-              </span>
-            ) : (
-              p
-            )}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: "模型",
-      dataIndex: "model_name",
-      key: "model_name",
-      width: 180,
-      ellipsis: true,
-      render: (m: string) => (
-        <Text code className="text-xs">
-          {m}
-        </Text>
-      ),
-    },
-    {
-      title: "接口地址",
-      dataIndex: "base_url",
-      key: "base_url",
-      width: 200,
-      ellipsis: true,
-      render: (url: string | null) =>
-        url ? (
-          <Tooltip title={url}>
-            <Text type="secondary" className="text-xs block truncate">
-              {url}
-            </Text>
+  const columns = useMemo(
+    () => [
+      {
+        title: "配置名称",
+        dataIndex: "name",
+        key: "name",
+        width: 200,
+        ellipsis: true,
+        render: (name: string, record: LLMConfigItem) => (
+          <Tooltip title={name}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-medium truncate">{name}</span>
+              {record.is_active && (
+                <Tag
+                  color="success"
+                  icon={<CheckCircleOutlined />}
+                  className="!m-0 shrink-0"
+                >
+                  默认
+                </Tag>
+              )}
+            </div>
           </Tooltip>
-        ) : (
-          <Text type="secondary" className="text-xs">
-            供应商默认
+        ),
+      },
+      {
+        title: "供应商",
+        dataIndex: "provider",
+        key: "provider",
+        width: 120,
+        ellipsis: true,
+        render: (p: string) => {
+          const meta = PROVIDER_META[p];
+          return (
+            <Tag color={PROVIDER_TAG_COLORS[p] || "default"}>
+              {meta ? (
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: meta.color }}
+                  />
+                  {meta.label}
+                </span>
+              ) : (
+                p
+              )}
+            </Tag>
+          );
+        },
+      },
+      {
+        title: "模型",
+        dataIndex: "model_name",
+        key: "model_name",
+        width: 180,
+        ellipsis: true,
+        render: (m: string) => (
+          <Text code className="text-xs">
+            {m}
           </Text>
         ),
-    },
-    {
-      title: "操作",
-      key: "actions",
-      width: 260,
-      render: (_: unknown, record: LLMConfigItem) => {
-        const isTesting = testingId === record.id;
-        return (
-          <Space size={4}>
-            <Tooltip title="发送 ping 请求验证 Key 与接口是否可用">
-              <Button
-                type="default"
-                size="small"
-                icon={isTesting ? <LoadingOutlined /> : <WifiOutlined />}
-                onClick={() => handleTest(record.id)}
-                loading={isTesting}
-              >
-                测试
-              </Button>
+      },
+      {
+        title: "接口地址",
+        dataIndex: "base_url",
+        key: "base_url",
+        width: 200,
+        ellipsis: true,
+        render: (url: string | null) =>
+          url ? (
+            <Tooltip title={url}>
+              <Text type="secondary" className="text-xs block truncate">
+                {url}
+              </Text>
             </Tooltip>
-            {!record.is_active && (
-              <Tooltip title="设为默认模型，问答时优先使用">
+          ) : (
+            <Text type="secondary" className="text-xs">
+              供应商默认
+            </Text>
+          ),
+      },
+      {
+        title: "操作",
+        key: "actions",
+        width: 260,
+        render: (_: unknown, record: LLMConfigItem) => {
+          const isTesting = testingId === record.id;
+          return (
+            <Space size={4}>
+              <Tooltip title="发送 ping 请求验证 Key 与接口是否可用">
                 <Button
                   type="default"
                   size="small"
-                  icon={<ThunderboltOutlined />}
-                  onClick={() => handleActivate(record.id)}
+                  icon={isTesting ? <LoadingOutlined /> : <WifiOutlined />}
+                  onClick={() => handleTest(record.id)}
+                  loading={isTesting}
                 >
-                  设为默认
+                  测试
                 </Button>
               </Tooltip>
-            )}
-            <Button
-              type="default"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openEdit(record)}
-            >
-              编辑
-            </Button>
-            <Popconfirm
-              title="确定删除此配置？"
-              description="删除后不可恢复"
-              onConfirm={() => handleDelete(record.id)}
-              okText="确定"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Space>
-        );
+              {!record.is_active && (
+                <Tooltip title="设为默认模型，问答时优先使用">
+                  <Button
+                    type="default"
+                    size="small"
+                    icon={<ThunderboltOutlined />}
+                    onClick={() => handleActivate(record.id)}
+                  >
+                    设为默认
+                  </Button>
+                </Tooltip>
+              )}
+              <Button
+                type="default"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEdit(record)}
+              >
+                编辑
+              </Button>
+              <Popconfirm
+                title="确定删除此配置？"
+                description="删除后不可恢复"
+                onConfirm={() => handleDelete(record.id)}
+                okText="确定"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+              >
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Space>
+          );
+        },
       },
-    },
-  ];
+    ],
+    [
+      testingId,
+      visibleKeys,
+      handleActivate,
+      handleTest,
+      openEdit,
+      handleDelete,
+      toggleKeyVisibility,
+    ],
+  );
 
   return (
     <div className="max-w-[1060px] mx-auto space-y-5">
