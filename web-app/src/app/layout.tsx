@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { ConfigProvider, Spin } from "antd";
+import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
@@ -42,15 +41,7 @@ export default function RootLayout({
               },
             }}
           >
-            <Suspense
-              fallback={
-                <div className="flex h-screen items-center justify-center">
-                  <Spin size="large" />
-                </div>
-              }
-            >
-              <AppShell>{children}</AppShell>
-            </Suspense>
+            <AppShell>{children}</AppShell>
           </ConfigProvider>
         </AntdRegistry>
       </body>

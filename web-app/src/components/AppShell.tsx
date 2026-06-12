@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -43,9 +43,12 @@ interface SessionItem {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const currentSessionId = searchParams.get("session_id");
+  // Track whether the initial user fetch has completed.
+  // We must NOT replace the whole component tree with a spinner on
+  // subsequent refreshes — that would unmount children (the page) and
+  // cause a visible full-page flash on every route change.
+  const userFirstLoadDone = useRef(false);
 
   // ── current user ──
   const { data: user = null, loading: userLoading } = useRequest(
@@ -55,7 +58,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
     {
       refreshDeps: [pathname],
+      onSuccess: () => {
+        userFirstLoadDone.current = true;
+      },
       onError: () => {
+        userFirstLoadDone.current = true;
         if (pathname !== "/login") {
           router.replace(buildLoginUrl(pathname));
         }
@@ -64,12 +71,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   // ── qa sessions ──
-  const { data: qaSessions = [], loading: sessionsLoading, run: loadQaSessions } = useApi<SessionItem[]>(
-    "/qa/sessions",
-    {
-      refreshDeps: [!!user],
-    },
-  );
+  const {
+    data: qaSessions = [],
+    loading: sessionsLoading,
+    run: loadQaSessions,
+  } = useApi<SessionItem[]>("/qa/sessions", {
+    refreshDeps: [!!user],
+  });
 
   // ── delete session ──
   const { run: handleDeleteSession } = useApi(
@@ -80,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       onSuccess: (_data, params) => {
         const [id] = params;
         message.success("会话已删除");
-        if (currentSessionId === String(id)) {
+        if (currentSessionIdRef.current === String(id)) {
           router.push("/qa");
         }
         loadQaSessions();
@@ -91,6 +99,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       },
     },
   );
+
+  // Store currentSessionId via ref so the delete callback can read it
+  // without depending on useSearchParams at the top level.
+  const currentSessionIdRef = useRef<string | null>(null);
+
+  // Callback for SessionHistoryBlock to update the ref
+  const handleCurrentSessionIdChange = (id: string | null) => {
+    currentSessionIdRef.current = id;
+  };
 
   // ── logout ──
   const { run: handleLogout } = useRequest(
@@ -187,7 +204,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <App>{children}</App>;
   }
 
-  if (userLoading) {
+  if (!userFirstLoadDone.current) {
     return (
       <Layout
         style={{
@@ -248,66 +265,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="app-sidebar-section-title">
               <span>历史会话</span>
             </div>
-            {sessionsLoading ? (
-              <div className="app-sidebar-session-list" style={{ padding: "0 8px" }}>
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton
-                    key={i}
-                    active
-                    paragraph={{ rows: 1, width: "70%" }}
-                    title={false}
-                    style={{ padding: "0 4px", marginBottom: 4 }}
-                  />
-                ))}
-              </div>
-            ) : qaSessions.length === 0 ? (
-              <div className="app-sidebar-empty">暂无历史会话</div>
-            ) : (
-              <div className="app-sidebar-session-list">
-                {qaSessions.map((session) => {
-                  const active = currentSessionId === String(session.id);
-                  return (
-                    <div
-                      key={session.id}
-                      className={`app-sidebar-session ${
-                        active ? "app-sidebar-session-active" : ""
-                      }`}
-                    >
-                      <div
-                        onClick={() =>
-                          router.push(`/qa?session_id=${session.id}`)
-                        }
-                        className="app-sidebar-session-link"
-                      >
-                        <span className="app-sidebar-session-title">
-                          {session.title || "新会话"}
-                        </span>
-                      </div>
-                      <Popconfirm
-                        title="确定删除此会话？"
-                        description="删除后不可恢复"
-                        onConfirm={() => handleDeleteSession(session.id)}
-                        onCancel={(e) => {
-                          (e as React.MouseEvent).stopPropagation();
-                        }}
-                        okText="删除"
-                        cancelText="取消"
-                        okButtonProps={{ danger: true }}
-                      >
-                        <button
-                          type="button"
-                          className="app-sidebar-session-delete"
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="删除会话"
-                        >
-                          <DeleteOutlined />
-                        </button>
-                      </Popconfirm>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <Suspense
+              fallback={
+                <div
+                  className="app-sidebar-session-list"
+                  style={{ padding: "0 8px" }}
+                >
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton
+                      key={i}
+                      active
+                      paragraph={{ rows: 1, width: "70%" }}
+                      title={false}
+                      style={{ padding: "0 4px", marginBottom: 4 }}
+                    />
+                  ))}
+                </div>
+              }
+            >
+              <SessionHistoryBlock
+                sessions={qaSessions}
+                loading={sessionsLoading}
+                onDeleteSession={handleDeleteSession}
+                onCurrentSessionIdChange={handleCurrentSessionIdChange}
+              />
+            </Suspense>
           </div>
         </div>
 
@@ -344,5 +326,97 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <App>{children}</App>
       </Content>
     </Layout>
+  );
+}
+
+// ── SessionHistoryBlock ──────────────────────────────────────────────
+// Isolates useSearchParams() inside its own <Suspense> boundary so that
+// route changes don't trigger the outer layout Suspense / full-page reload.
+
+interface SessionHistoryBlockProps {
+  sessions: SessionItem[];
+  loading: boolean;
+  onDeleteSession: (id: number) => void;
+  onCurrentSessionIdChange: (id: string | null) => void;
+}
+
+function SessionHistoryBlock({
+  sessions,
+  loading,
+  onDeleteSession,
+  onCurrentSessionIdChange,
+}: SessionHistoryBlockProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const currentSessionId = searchParams.get("session_id");
+
+  // Keep the parent in sync so the delete callback can check the current id
+  useEffect(() => {
+    onCurrentSessionIdChange(currentSessionId);
+  }, [currentSessionId, onCurrentSessionIdChange]);
+
+  if (loading) {
+    return (
+      <div className="app-sidebar-session-list" style={{ padding: "0 8px" }}>
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton
+            key={i}
+            active
+            paragraph={{ rows: 1, width: "70%" }}
+            title={false}
+            style={{ padding: "0 4px", marginBottom: 4 }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (sessions.length === 0) {
+    return <div className="app-sidebar-empty">暂无历史会话</div>;
+  }
+
+  return (
+    <div className="app-sidebar-session-list">
+      {sessions.map((session) => {
+        const active = currentSessionId === String(session.id);
+        return (
+          <div
+            key={session.id}
+            className={`app-sidebar-session ${
+              active ? "app-sidebar-session-active" : ""
+            }`}
+          >
+            <div
+              onClick={() => router.push(`/qa?session_id=${session.id}`)}
+              className="app-sidebar-session-link"
+            >
+              <span className="app-sidebar-session-title">
+                {session.title || "新会话"}
+              </span>
+            </div>
+            <Popconfirm
+              title="确定删除此会话？"
+              description="删除后不可恢复"
+              onConfirm={() => onDeleteSession(session.id)}
+              onCancel={(e) => {
+                (e as React.MouseEvent).stopPropagation();
+              }}
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <button
+                type="button"
+                className="app-sidebar-session-delete"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="删除会话"
+              >
+                <DeleteOutlined />
+              </button>
+            </Popconfirm>
+          </div>
+        );
+      })}
+    </div>
   );
 }
