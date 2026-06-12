@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   App,
   Button,
@@ -41,10 +41,12 @@ interface SessionItem {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [qaSessions, setQaSessions] = useState<SessionItem[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  const currentSessionId = searchParams.get("session_id");
 
   useEffect(() => {
     if (pathname === "/login") {
@@ -70,7 +72,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       await apiFetch(`/qa/sessions/${id}`, { method: "DELETE" });
       message.success("会话已删除");
       if (currentSessionId === String(id)) {
-        setCurrentSessionId(null);
         router.push("/qa");
       }
       loadQaSessions();
@@ -102,35 +103,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const isQaPage = selectedKey === "/qa";
 
-  useEffect(() => {
-    const syncSessionId = () => {
-      setCurrentSessionId(
-        new URLSearchParams(window.location.search).get("session_id"),
-      );
-    };
-    const handleSessionSelected = (event: Event) => {
-      const detail = (event as CustomEvent<{ sessionId?: number | null }>)
-        .detail;
-      if (detail && "sessionId" in detail) {
-        setCurrentSessionId(
-          detail.sessionId === null || detail.sessionId === undefined
-            ? null
-            : String(detail.sessionId),
-        );
-        return;
-      }
-      syncSessionId();
-    };
-
-    syncSessionId();
-    window.addEventListener("popstate", syncSessionId);
-    window.addEventListener("qa:session-selected", handleSessionSelected);
-    return () => {
-      window.removeEventListener("popstate", syncSessionId);
-      window.removeEventListener("qa:session-selected", handleSessionSelected);
-    };
-  }, [pathname]);
-
   const loadQaSessions = useCallback(async () => {
     if (!user) return;
     try {
@@ -143,7 +115,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadQaSessions();
-  }, [loadQaSessions, currentSessionId]);
+  }, [loadQaSessions]);
 
   useEffect(() => {
     window.addEventListener("qa:sessions-updated", loadQaSessions);
@@ -221,7 +193,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <Layout className="app-shell">
       <aside className="app-sidebar">
         <div className="app-sidebar-top">
-          <Link href="/qa" className="app-shell-brand">
+          <div className="app-shell-brand">
             <span className="app-shell-brand-icon">
               <BookOutlined />
             </span>
@@ -229,13 +201,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span className="app-shell-brand-title">知识中枢</span>
               <span className="app-shell-brand-subtitle">企业知识库助手</span>
             </span>
-          </Link>
+          </div>
 
-          <Link
-            href="/qa"
-            className="app-sidebar-new"
-            onClick={() => setCurrentSessionId(null)}
-          >
+          <Link href="/qa" className="app-sidebar-new">
             <PlusSquareOutlined />
             <span>新建问答</span>
           </Link>
@@ -262,7 +230,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="app-sidebar-history">
             <div className="app-sidebar-section-title">
               <span>历史会话</span>
-              <QuestionCircleOutlined />
             </div>
             {qaSessions.length === 0 ? (
               <div className="app-sidebar-empty">暂无历史会话</div>
@@ -279,7 +246,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     >
                       <Link
                         href={`/qa?session_id=${session.id}`}
-                        onClick={() => setCurrentSessionId(String(session.id))}
                         className="app-sidebar-session-link"
                       >
                         <span className="app-sidebar-session-title">

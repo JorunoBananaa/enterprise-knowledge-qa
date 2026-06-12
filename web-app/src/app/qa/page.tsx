@@ -14,7 +14,7 @@ import {
 } from "antd";
 import { RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiFetchStream } from "@/lib/api";
 import CitationList from "@/components/CitationList";
 
 const { Text, Paragraph } = Typography;
@@ -155,7 +155,7 @@ function QAPageContent() {
     loadMessages(nextSessionId);
   }, [searchParams, loadMessages]);
 
-  // ── ask question ─────────────────────────────────────────────────
+  // ── ask question (streaming) ────────────────────────────────────
 
   const handleAsk = async (msg?: string) => {
     const q = (msg ?? question).trim();
@@ -167,40 +167,81 @@ function QAPageContent() {
     setQuestion("");
     setLoading(true);
 
+    // Placeholder message that will be updated as tokens arrive
+    const placeholder: ChatMessageOut = {
+      id: -Date.now(), // temporary negative id; replaced on done
+      question: q,
+      answer: "",
+      result_status: "streaming",
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, placeholder]);
+    const placeholderId = placeholder.id;
+
     try {
-      const data = await apiFetch<AskResponse>("/qa/ask", {
+      let isFirstChunk = true;
+      let sessionId = activeId;
+
+      for await (const event of apiFetchStream("/qa/ask/stream", {
         method: "POST",
         body: JSON.stringify({
           question: q,
           session_id: activeId,
           llm_config_id: selectedLlmId ?? null,
         }),
-      });
+      })) {
+        switch (event.type) {
+          case "chunk":
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId
+                  ? { ...m, answer: m.answer + event.text }
+                  : m,
+              ),
+            );
+            break;
 
-      const newMsg: ChatMessageOut = {
-        id: data.message_id,
-        question: q,
-        answer: data.answer,
-        result_status: data.status,
-        created_at: new Date().toISOString(),
-      };
+          case "citation":
+            // Citations are accumulated internally by the backend;
+            // the frontend optionally stores them when the message is reloaded.
+            break;
 
-      // If this is a brand-new session, set it active
-      if (!activeId) {
-        setActiveId(data.session_id);
-        router.replace(`/qa?session_id=${data.session_id}`);
-        await loadSessions();
-        window.dispatchEvent(
-          new CustomEvent("qa:session-selected", {
-            detail: { sessionId: data.session_id },
-          }),
-        );
-        window.dispatchEvent(new Event("qa:sessions-updated"));
+          case "done": {
+            // Replace placeholder with finalised message
+            if (event.session_id != null) sessionId = event.session_id;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId
+                  ? {
+                      ...m,
+                      id: event.message_id ?? placeholderId,
+                      result_status: event.status,
+                    }
+                  : m,
+              ),
+            );
+
+            // If this is a brand-new session, set it active
+            if (!activeId && sessionId != null) {
+              setActiveId(sessionId);
+              router.replace(`/qa?session_id=${sessionId}`);
+              await loadSessions();
+              window.dispatchEvent(new Event("qa:sessions-updated"));
+            }
+            break;
+          }
+
+          case "error":
+            message.error(event.message);
+            // Remove the placeholder on error
+            setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+            break;
+        }
       }
-
-      setMessages((prev) => [...prev, newMsg]);
     } catch (err) {
       message.error(err instanceof Error ? err.message : "获取答案失败");
+      // Remove the placeholder on error
+      setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
     } finally {
       setLoading(false);
     }
@@ -371,7 +412,9 @@ function QAPageContent() {
                               color={
                                 msg.result_status === "answered"
                                   ? "success"
-                                  : "warning"
+                                  : msg.result_status === "streaming"
+                                    ? "processing"
+                                    : "warning"
                               }
                               style={{
                                 fontSize: 11,
@@ -381,7 +424,9 @@ function QAPageContent() {
                             >
                               {msg.result_status === "answered"
                                 ? "已作答"
-                                : "证据不足"}
+                                : msg.result_status === "streaming"
+                                  ? "生成中…"
+                                  : "证据不足"}
                             </Tag>
                           </div>
                           <Paragraph

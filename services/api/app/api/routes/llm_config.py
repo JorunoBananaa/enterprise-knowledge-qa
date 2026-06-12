@@ -9,7 +9,6 @@ from app.api.deps import get_current_user, require_admin
 from app.repositories.llm_config import (
     create_llm_config,
     delete_llm_config,
-    get_active_llm_config,
     get_llm_config,
     list_llm_configs,
     set_active_llm_config,
@@ -45,18 +44,6 @@ def list_configs_brief(
 ) -> list[LLMConfigBrief]:
     configs = list_llm_configs()
     return [LLMConfigBrief.from_orm_obj(c) for c in configs]
-
-
-# ── Get active config ─────────────────────────────────────────────────
-
-@router.get("/active", response_model=LLMConfigResponse | dict[str, str])
-def get_active(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
-):
-    cfg = get_active_llm_config()
-    if cfg is None:
-        return {"detail": "没有激活的大模型配置"}
-    return LLMConfigResponse.from_orm_obj(cfg)
 
 
 # ── Create ────────────────────────────────────────────────────────────

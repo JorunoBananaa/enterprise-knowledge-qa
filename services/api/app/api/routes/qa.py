@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated
+import json
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -11,16 +13,12 @@ from app.repositories.llm_config import get_active_llm_config, get_llm_config
 from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
     AskRequest,
-    AskResponse,
     ChatMessageOut,
     ChatSessionDetail,
     ChatSessionOut,
-    CitationItem,
-    CreateSessionRequest,
-    CreateSessionResponse,
 )
 from app.services.llm_factory import create_chat_model
-from app.services.rag import answer_question
+from app.services.rag import answer_question_stream
 
 router = APIRouter()
 
@@ -31,6 +29,75 @@ def _first_line(text: str, max_len: int = 60) -> str:
     """Extract first line of text as a title fallback."""
     line = text.split("\n")[0].strip()
     return line[:max_len] + ("…" if len(line) > max_len else "")
+
+
+def format_sse(event_type: str, data: dict | str | None = None) -> str:
+    """Format a Server-Sent Event string."""
+    if data is None:
+        data = {}
+    payload = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data
+    return f"event: {event_type}\ndata: {payload}\n\n"
+
+
+def _resolve_session(
+    user_id: str,
+    session_id: int | None,
+    question: str,
+    db: Session,
+) -> ChatSession:
+    """Resolve or create a chat session."""
+    if session_id is not None:
+        session = (
+            db.query(ChatSession)
+            .filter(
+                ChatSession.id == session_id,
+                ChatSession.user_id == user_id,
+            )
+            .first()
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        return session
+
+    session = ChatSession(
+        user_id=user_id,
+        title=_first_line(question),
+    )
+    db.add(session)
+    db.flush()
+    return session
+
+
+def _resolve_llm(llm_config_id: int | None) -> Any | None:
+    """Resolve LLM from config; returns None for fake fallback."""
+    if llm_config_id is not None and llm_config_id > 0:
+        cfg = get_llm_config(llm_config_id)
+        if cfg is None:
+            raise HTTPException(status_code=404, detail="大模型配置不存在")
+        try:
+            return create_chat_model(
+                provider=cfg.provider,
+                model_name=cfg.model_name,
+                api_key=cfg.api_key,
+                base_url=cfg.base_url,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
+
+    if llm_config_id is None:
+        active = get_active_llm_config()
+        if active is not None:
+            try:
+                return create_chat_model(
+                    provider=active.provider,
+                    model_name=active.model_name,
+                    api_key=active.api_key,
+                    base_url=active.base_url,
+                )
+            except Exception:
+                pass
+
+    return None
 
 
 # ── Sessions ──────────────────────────────────────────────────────────
@@ -64,21 +131,6 @@ def list_sessions(
             )
         )
     return out
-
-
-@router.post("/sessions", response_model=CreateSessionResponse)
-def create_session(
-    payload: CreateSessionRequest,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-) -> CreateSessionResponse:
-    """Create a new empty chat session."""
-    user_id = str(current_user.id)
-    session = ChatSession(user_id=user_id, title=payload.title)
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-    return CreateSessionResponse(id=session.id, title=session.title)
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
@@ -129,72 +181,53 @@ def delete_session(
     )
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
+
+    # Delete citations then messages (citations FK to messages)
+    message_ids = [
+        m.id
+        for m in db.query(ChatMessage.id)
+        .filter(ChatMessage.session_id == session_id)
+        .all()
+    ]
+    if message_ids:
+        db.query(Citation).filter(Citation.chat_message_id.in_(message_ids)).delete()
+        db.query(ChatMessage).filter(ChatMessage.session_id == session_id).delete()
+
     db.delete(session)
     db.commit()
 
 
-# ── Ask ───────────────────────────────────────────────────────────────
+# ── Ask (streaming) ───────────────────────────────────────────────────
 
-@router.post("/ask", response_model=AskResponse)
-def ask_question(
+@router.post("/ask/stream")
+async def ask_question_stream(
     payload: AskRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
-) -> AskResponse:
-    """Ask a question. If session_id is None a new session is created automatically."""
+):
+    """Ask a question with SSE streaming response.
+
+    Events:
+        chunk   → {"text": "…"}
+        citation → {"document_id": …, "chunk_id": …, "locator": …}
+        done    → {"status": "answered", "session_id": …, "message_id": …}
+        error   → {"message": "…"}
+    """
     user_id = str(current_user.id)
 
-    # Resolve or create session
-    if payload.session_id is not None:
-        session = (
-            db.query(ChatSession)
-            .filter(
-                ChatSession.id == payload.session_id,
-                ChatSession.user_id == user_id,
-            )
-            .first()
-        )
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
-    else:
-        session = ChatSession(
-            user_id=user_id,
-            title=_first_line(payload.question),
-        )
-        db.add(session)
-        db.flush()  # get session.id
+    session = _resolve_session(user_id, payload.session_id, payload.question, db)
 
-    # Resolve LLM
-    llm = None
-    if payload.llm_config_id is not None and payload.llm_config_id > 0:
-        cfg = get_llm_config(payload.llm_config_id)
-        if cfg is None:
-            raise HTTPException(status_code=404, detail="大模型配置不存在")
-        try:
-            llm = create_chat_model(
-                provider=cfg.provider,
-                model_name=cfg.model_name,
-                api_key=cfg.api_key,
-                base_url=cfg.base_url,
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
-    elif payload.llm_config_id is None:
-        # Try active config
-        active = get_active_llm_config()
-        if active is not None:
-            try:
-                llm = create_chat_model(
-                    provider=active.provider,
-                    model_name=active.model_name,
-                    api_key=active.api_key,
-                    base_url=active.base_url,
-                )
-            except Exception:
-                # Silently fall back to fake mode
-                pass
+    # Build LLM synchronously (same logic as non-streaming)
+    from contextlib import asynccontextmanager
 
-    # Retrieve chunks (fake for MVP; real implementation uses pgvector similarity search)
+    try:
+        llm = _resolve_llm(payload.llm_config_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
+
+    # Retrieve chunks (fake for MVP)
     fake_chunks = [
         {
             "chunk_id": 1,
@@ -203,50 +236,75 @@ def ask_question(
             "text": "The standard warranty is 12 months from the date of purchase.",
         }
     ]
-    result = answer_question(
-        question=payload.question,
-        retrieved_chunks=fake_chunks,
-        system_prompt="请根据公司知识库回答。回答应简洁有用。",
-        user_prompt=None,
-        llm=llm,
-    )
 
-    # Persist message
-    msg = ChatMessage(
-        session_id=session.id,
-        question=payload.question,
-        answer=result.answer,
-        result_status=result.status,
-    )
-    db.add(msg)
-    db.flush()  # get msg.id
+    async def _stream_events():
+        chunks_received: list[str] = []
+        citation_list: list[dict] = []
 
-    # Persist citations
-    for c in result.citations:
-        db.add(
-            Citation(
-                chat_message_id=msg.id,
-                document_id=c["document_id"],
-                chunk_id=c["chunk_id"],
-                locator=c["locator"],
-                quoted_text_preview=c.get("quoted_text_preview", ""),
-                rank=1,
-            )
-        )
+        try:
+            async for event in answer_question_stream(
+                question=payload.question,
+                retrieved_chunks=fake_chunks,
+                system_prompt="请根据公司知识库回答。回答应简洁有用。",
+                user_prompt=None,
+                llm=llm,
+            ):
+                if event["type"] == "chunk":
+                    chunks_received.append(event["text"])
+                    yield format_sse("chunk", {"text": event["text"]})
 
-    db.commit()
+                elif event["type"] == "citation":
+                    citation_list.append(event)
+                    yield format_sse("citation", event)
 
-    return AskResponse(
-        session_id=session.id,
-        message_id=msg.id,
-        status=result.status,
-        answer=result.answer,
-        citations=[
-            CitationItem(
-                document_id=c["document_id"],
-                chunk_id=c["chunk_id"],
-                locator=c["locator"],
-            )
-            for c in result.citations
-        ],
+                elif event["type"] == "done":
+                    # Persist message + citations on "done"
+                    full_answer = "".join(chunks_received)
+                    msg = ChatMessage(
+                        session_id=session.id,
+                        question=payload.question,
+                        answer=full_answer,
+                        result_status=event.get("status", "answered"),
+                    )
+                    db.add(msg)
+                    db.flush()
+
+                    for c in citation_list:
+                        db.add(
+                            Citation(
+                                chat_message_id=msg.id,
+                                document_id=c.get("document_id", 0),
+                                chunk_id=c.get("chunk_id", 0),
+                                locator=c.get("locator", ""),
+                                quoted_text_preview=c.get("quoted_text_preview", ""),
+                                rank=1,
+                            )
+                        )
+
+                    db.commit()
+
+                    yield format_sse("done", {
+                        "status": event.get("status", "answered"),
+                        "session_id": session.id,
+                        "message_id": msg.id,
+                    })
+                    return
+
+                elif event["type"] == "error":
+                    yield format_sse("error", {"message": event["message"]})
+                    return
+
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception("Stream error")
+            yield format_sse("error", {"message": f"流式生成失败: {exc}"})
+
+    return StreamingResponse(
+        _stream_events(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )
