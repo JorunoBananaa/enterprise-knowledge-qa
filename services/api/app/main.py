@@ -52,10 +52,6 @@ def _seed_database() -> None:
             ))
         db.commit()
 
-        # Seed default category
-        if db.query(KnowledgeCategory).filter(KnowledgeCategory.name == "产品 A").first() is None:
-            db.add(KnowledgeCategory(name="产品 A"))
-            db.commit()
     finally:
         db.close()
 
