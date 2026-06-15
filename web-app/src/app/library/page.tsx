@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Table,
   Button,
@@ -17,9 +17,13 @@ import {
   Input,
   App,
   Dropdown,
+  Upload,
+  Spin,
+  Alert,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { DataNode } from "antd/es/tree";
+import type { UploadProps } from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
@@ -29,6 +33,7 @@ import {
   DeleteOutlined,
   UploadOutlined,
   MoreOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser } from "@/lib/auth-client";
@@ -52,6 +57,7 @@ interface CategoryItem {
   id: number;
   name: string;
   parent_id: number | null;
+  documents_count: number;
 }
 
 // ── build category tree for antd Tree ──
@@ -142,9 +148,42 @@ const columns: ColumnsType<Document> = [
 // ── page ──
 
 export default function LibraryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-[1160px] mx-auto">
+          <PageHeader
+            label="KNOWLEDGE BASE"
+            icon={<BookOutlined />}
+            title="知识库"
+            description="分类管理知识文档，上传后经审核即可加入检索索引"
+          />
+          <div className="flex gap-5 items-start">
+            <Card
+              className="shrink-0 overflow-hidden"
+              styles={{ body: { padding: "12px 8px 8px", overflow: "hidden" } }}
+              style={{ width: 260 }}
+            >
+              <Skeleton active paragraph={{ rows: 4 }} title={false} />
+            </Card>
+            <div className="flex-1 flex items-center justify-center min-h-[400px]">
+              <Skeleton active paragraph={{ rows: 6 }} />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <LibraryPageContent />
+    </Suspense>
+  );
+}
+
+function LibraryPageContent() {
   const { message, modal } = App.useApp();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const categoryParam = searchParams.get("category_id");
+  const selectedCategory = categoryParam != null ? Number(categoryParam) : null;
   const [status, setStatus] = useState<string>();
 
   // ── current user (for admin check) ──
@@ -167,6 +206,57 @@ export default function LibraryPage() {
     { refreshDeps: [selectedCategory, status] },
   );
 
+  // ── delete document ──
+  const { loading: deleting, run: doDeleteDoc } = useApi(
+    (id: number) => `/documents/${id}`,
+    {
+      method: "DELETE",
+      manual: true,
+      onSuccess: () => {
+        message.success("文档已删除");
+        // 如果删除的是当前列表最后一项且不是第一页，前端保持当前页即可（后端会自动返回前一页数据）
+        fetchDocs();
+        fetchCategories();
+      },
+      onError: (err) => {
+        message.error(err instanceof Error ? err.message : "删除失败");
+      },
+    },
+  );
+
+  // ── document table columns (with actions) ──
+  const tableColumns: ColumnsType<Document> = useMemo(
+    () => [
+      ...columns,
+      {
+        title: "操作",
+        key: "actions",
+        width: 80,
+        render: (_: unknown, record: Document) => (
+          <Button
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            loading={deleting}
+            onClick={() => {
+              modal.confirm({
+                title: "确定删除此文档？",
+                content: `将同时删除文档「${record.title}」及其全部索引数据，此操作不可撤销。`,
+                okText: "确认删除",
+                cancelText: "取消",
+                okButtonProps: { danger: true },
+                onOk: () => doDeleteDoc(record.id),
+              });
+            }}
+          >
+            删除
+          </Button>
+        ),
+      },
+    ],
+    [deleting, modal, doDeleteDoc],
+  );
+
   // 保持上一次数据，避免切换分类时闪烁
   const prevDocsData = useRef(docsData);
   if (docsData) prevDocsData.current = docsData;
@@ -187,13 +277,73 @@ export default function LibraryPage() {
   // ── category CRUD modal ──
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editingCatId, setEditingCatId] = useState<number | null>(null);
+  const [creatingParentId, setCreatingParentId] = useState<number | null>(null);
   const [catForm] = Form.useForm();
 
   const openCreateCat = (parentId?: number) => {
     setEditingCatId(null);
+    setCreatingParentId(parentId ?? null);
     catForm.resetFields();
-    catForm.setFieldsValue({ parent_id: parentId ?? undefined });
     setCatModalOpen(true);
+  };
+
+  // ── upload modal ──
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCategoryId, setUploadCategoryId] = useState<number | null>(null);
+  const [uploadForm] = Form.useForm();
+
+  const openUploadModal = (categoryId: number) => {
+    setUploadFile(null);
+    setUploadCategoryId(categoryId);
+    uploadForm.resetFields();
+    setUploadModalOpen(true);
+  };
+
+  const {
+    loading: uploading,
+    error: uploadError,
+    run: doUpload,
+  } = useApi("/documents", {
+    method: "POST",
+    manual: true,
+    onSuccess: () => {
+      setUploadModalOpen(false);
+      message.success("文档上传成功");
+      fetchDocs();
+      fetchCategories();
+    },
+    onError: (err) => {
+      message.error(err instanceof Error ? err.message : "上传失败");
+    },
+  });
+
+  const handleUploadSubmit = (values: { title: string }) => {
+    if (!uploadFile) {
+      message.warning("请选择文件");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("title", values.title);
+    formData.append("category_id", String(uploadCategoryId));
+    formData.append("file", uploadFile);
+    doUpload(formData);
+  };
+
+  const uploadDraggerProps: UploadProps = {
+    maxCount: 1,
+    beforeUpload: (file) => {
+      setUploadFile(file);
+      return false;
+    },
+    onRemove: () => setUploadFile(null),
+    onChange: (info) => {
+      if (info.file.name && !uploadForm.getFieldValue("title")) {
+        const nameWithoutExt = info.file.name.replace(/\.[^/.]+$/, "");
+        uploadForm.setFieldsValue({ title: nameWithoutExt });
+      }
+    },
+    accept: ".pdf,.docx,.pptx,.xlsx",
   };
 
   const openEditCat = (record: CategoryItem) => {
@@ -230,20 +380,23 @@ export default function LibraryPage() {
 
   const catSubmitting = creating || updating;
 
-  const handleCatSubmit = (values: { name: string; parent_id?: number }) => {
+  const handleCatSubmit = (values: { name: string }) => {
     if (editingCatId != null) {
       doUpdate(editingCatId, { name: values.name });
     } else {
-      doCreate({ name: values.name, parent_id: values.parent_id ?? null });
+      doCreate({ name: values.name, parent_id: creatingParentId });
     }
   };
 
   const { run: doDeleteCat } = useApi((id: number) => `/categories/${id}`, {
     method: "DELETE",
     manual: true,
-    onSuccess: () => {
+    onSuccess: (_data, params) => {
+      const deletedCategoryId = params[0];
       message.success("分类已删除");
-      if (selectedCategory === editingCatId) setSelectedCategory(null);
+      if (selectedCategory === deletedCategoryId) {
+        router.push("/library");
+      }
       fetchCategories();
     },
     onError: (err) => {
@@ -263,8 +416,7 @@ export default function LibraryPage() {
       key: "upload",
       icon: <UploadOutlined />,
       label: "上传文档",
-      onClick: () =>
-        router.push(`/library/upload?categoryId=${node.categoryId}`),
+      onClick: () => openUploadModal(node.categoryId),
     },
     {
       key: "edit",
@@ -282,10 +434,16 @@ export default function LibraryPage() {
       label: "删除分类",
       danger: true,
       onClick: () => {
+        const cat = categories.find((c) => c.id === node.categoryId);
+        const count = cat?.documents_count ?? 0;
+
         modal.confirm({
           title: "确定删除此分类？",
-          content: "如分类下有文档则无法删除",
-          okText: "确定",
+          content:
+            count > 0
+              ? `该分类下共有 ${count} 篇文档，将同时删除所有子分类及其下的全部文档，此操作不可撤销。`
+              : "将同时删除所有子分类及其下的全部文档，此操作不可撤销。",
+          okText: "确认删除",
           cancelText: "取消",
           okButtonProps: { danger: true },
           onOk: () => doDeleteCat(node.categoryId),
@@ -335,6 +493,13 @@ export default function LibraryPage() {
     [catTree, categories, isAdmin],
   );
 
+  // 默认选中第一个根分类
+  useEffect(() => {
+    if (!catLoading && selectedCategory === null && catTree.length > 0) {
+      router.replace(`/library?category_id=${catTree[0].categoryId}`);
+    }
+  }, [catLoading, selectedCategory, catTree, router]);
+
   return (
     <div className="max-w-[1160px] mx-auto">
       <PageHeader
@@ -380,10 +545,10 @@ export default function LibraryPage() {
               }
               onSelect={(keys) => {
                 const key = keys[0] as string | undefined;
-                if (!key) {
-                  setSelectedCategory(null);
-                } else if (key.startsWith("cat-")) {
-                  setSelectedCategory(Number(key.slice(4)));
+                if (!key) return; // 不允许取消选中
+                if (key.startsWith("cat-")) {
+                  const catId = key.slice(4);
+                  router.push(`/library?category_id=${catId}`);
                 }
               }}
               defaultExpandAll
@@ -395,52 +560,135 @@ export default function LibraryPage() {
         </Card>
 
         {/* ── right: document list ── */}
-        <div className="flex-1 min-w-0">
-          <Card className="!mb-4" styles={{ body: { padding: "12px 16px" } }}>
-            <Space wrap>
-              <Select
-                placeholder="审核状态"
-                allowClear
-                style={{ width: 160 }}
-                value={status || undefined}
-                onChange={(v) => setStatus(v)}
-                options={[
-                  { label: "待审核", value: "pending_review" },
-                  { label: "已通过", value: "approved" },
-                  { label: "已驳回", value: "rejected" },
-                ]}
-              />
-              <Button
-                icon={<SearchOutlined />}
-                loading={docsLoading}
-                onClick={() => fetchDocs()}
-              >
-                应用筛选
-              </Button>
-            </Space>
-          </Card>
+        {selectedCategory != null ? (
+          <div className="flex-1 min-w-0">
+            <Card className="!mb-4" styles={{ body: { padding: "12px 16px" } }}>
+              <Space wrap>
+                <Select
+                  placeholder="审核状态"
+                  allowClear
+                  style={{ width: 160 }}
+                  value={status || undefined}
+                  onChange={(v) => setStatus(v)}
+                  options={[
+                    { label: "待审核", value: "pending_review" },
+                    { label: "已通过", value: "approved" },
+                    { label: "已驳回", value: "rejected" },
+                  ]}
+                />
+                <Button
+                  icon={<SearchOutlined />}
+                  loading={docsLoading}
+                  onClick={() => fetchDocs()}
+                >
+                  应用筛选
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  onClick={() => openUploadModal(selectedCategory)}
+                >
+                  上传文档
+                </Button>
+              </Space>
+            </Card>
 
-          <Table
-            columns={columns}
-            dataSource={docs}
-            rowKey="id"
-            loading={docsLoading}
-            rowClassName="cursor-pointer transition-colors"
-            locale={{
-              emptyText: docsLoading ? (
-                " "
-              ) : (
-                <Empty description="暂无文档，请上传文档开始使用" />
-              ),
-            }}
-            pagination={{
-              total,
-              pageSize: 20,
-              showTotal: (t) => `共 ${t} 篇文档`,
-            }}
-          />
-        </div>
+            <Table
+              columns={tableColumns}
+              dataSource={docs}
+              rowKey="id"
+              loading={docsLoading}
+              rowClassName="cursor-pointer transition-colors"
+              locale={{
+                emptyText: docsLoading ? (
+                  " "
+                ) : (
+                  <Empty description="暂无文档，请上传文档开始使用" />
+                ),
+              }}
+              pagination={{
+                total,
+                pageSize: 20,
+                showTotal: (t) => `共 ${t} 篇文档`,
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center min-h-[400px]">
+            <Empty description="请从左侧选择一个分类查看文档" />
+          </div>
+        )}
       </div>
+
+      {/* ── upload modal ── */}
+      <Modal
+        title="上传文档"
+        open={uploadModalOpen}
+        onCancel={() => setUploadModalOpen(false)}
+        footer={null}
+        destroyOnClose
+        width={520}
+      >
+        <Spin spinning={uploading} tip="正在上传并处理文档...">
+          <Form
+            form={uploadForm}
+            layout="vertical"
+            onFinish={handleUploadSubmit}
+          >
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: "请输入文档标题" }]}
+            >
+              <Input placeholder="请输入文档标题" />
+            </Form.Item>
+
+            <Form.Item label="分类">
+              <Input
+                disabled
+                value={
+                  categories.find((c) => c.id === uploadCategoryId)?.name ?? ""
+                }
+                className="!text-zinc-700"
+              />
+            </Form.Item>
+
+            <Form.Item label="文件">
+              <Upload.Dragger {...uploadDraggerProps}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                <p className="ant-upload-hint">
+                  支持 PDF、Word、PPT、Excel 格式
+                </p>
+              </Upload.Dragger>
+            </Form.Item>
+
+            {uploadError && (
+              <Alert
+                message={
+                  uploadError instanceof Error
+                    ? uploadError.message
+                    : "上传失败"
+                }
+                type="error"
+                showIcon
+                className="!mb-4"
+              />
+            )}
+
+            <Form.Item className="!mb-0 text-right">
+              <Space>
+                <Button onClick={() => setUploadModalOpen(false)}>取消</Button>
+                <Button type="primary" htmlType="submit" loading={uploading}>
+                  {uploading ? "上传中..." : "上传到知识库"}
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Spin>
+      </Modal>
 
       {/* ── category modal ── */}
       <Modal

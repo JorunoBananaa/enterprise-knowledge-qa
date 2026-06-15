@@ -33,8 +33,6 @@ class ChatMessage(Base):
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
     result_status: Mapped[str] = mapped_column(default="answered")
-    system_prompt_version: Mapped[Optional[int]] = mapped_column(nullable=True)
-    user_prompt_version: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -52,5 +50,5 @@ class Citation(Base):
     document_id: Mapped[int] = mapped_column(ForeignKey("knowledge_documents.id"))
     chunk_id: Mapped[int]
     locator: Mapped[str] = mapped_column(Text)
-    quoted_text_preview: Mapped[str] = mapped_column(Text)
+    quoted_text_preview: Mapped[str] = mapped_column(Text, default="")
     rank: Mapped[int] = mapped_column(default=1)

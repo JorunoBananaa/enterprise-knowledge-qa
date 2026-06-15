@@ -23,15 +23,17 @@ interface Document {
 
 export default function DocumentDetailPage() {
   const params = useParams();
+  const rawId = params.id;
+  const documentId = Array.isArray(rawId) ? rawId[0] : rawId;
 
-  const { data: docsData, loading } = useApi<{ items: Document[] }>(
-    "/documents",
+  const { data: doc, loading, error } = useApi<Document>(
+    `/documents/${documentId}`,
   );
 
-  const doc = docsData?.items.find((d) => d.id === Number(params.id)) || null;
-
   if (loading) return <LoadingSpinner />;
-  if (!doc) return <Alert message="文档未找到" type="warning" showIcon />;
+  if (error || !doc) {
+    return <Alert message="文档未找到" type="warning" showIcon />;
+  }
 
   return (
     <div className="max-w-[800px] mx-auto">

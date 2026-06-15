@@ -97,9 +97,9 @@ def create_chat_model(
 
     if cls_name == "ChatOpenAI":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(temperature=temperature, **kwargs)
+        return ChatOpenAI(temperature=temperature, streaming=True, **kwargs)
     elif cls_name == "ChatAnthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(temperature=temperature, **kwargs)
+        return ChatAnthropic(temperature=temperature, streaming=True, **kwargs)
     else:
         raise ValueError(f"Unknown model class: {cls_name}")

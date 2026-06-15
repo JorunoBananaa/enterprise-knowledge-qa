@@ -1,6 +1,28 @@
 import { buildLoginUrl } from "./auth-client";
 
-const API_BASE = "/api";
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_BASE || "/api"
+).replace(/\/+$/, "");
+
+function resolveStreamApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_STREAM_API_BASE;
+  if (configured) return configured.replace(/\/+$/, "");
+
+  if (
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+
+  return API_BASE;
+}
+
+function buildApiUrl(base: string, path: string): string {
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 function currentPath(): string {
   if (typeof window === "undefined") return "/";
@@ -60,7 +82,14 @@ export async function apiFetch<T = unknown>(
 
 export type StreamEvent =
   | { type: "chunk"; text: string }
-  | { type: "citation"; document_id: number; chunk_id: number; locator: string }
+  | {
+      type: "citation";
+      document_id: number;
+      chunk_id: number;
+      locator: string;
+      quoted_text_preview?: string;
+      rank?: number;
+    }
   | { type: "done"; status: string; session_id?: number; message_id?: number }
   | { type: "error"; message: string };
 
@@ -76,10 +105,14 @@ export async function* apiFetchStream(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(buildApiUrl(resolveStreamApiBase(), path), {
     ...options,
     credentials: "include",
-    headers,
+    headers: {
+      Accept: "text/event-stream",
+      "Cache-Control": "no-cache",
+      ...headers,
+    },
   });
 
   if (res.status === 401) {
@@ -98,6 +131,7 @@ export async function* apiFetchStream(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let currentEvent = "";
 
   try {
     while (true) {
@@ -109,7 +143,6 @@ export async function* apiFetchStream(
       // Keep the last incomplete line in the buffer
       buffer = lines.pop() || "";
 
-      let currentEvent = "";
       for (const line of lines) {
         if (line.startsWith("event: ")) {
           currentEvent = line.slice(7).trim();

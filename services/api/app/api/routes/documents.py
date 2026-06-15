@@ -5,7 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app.api.deps import get_current_user
-from app.repositories.documents import create_document, list_documents
+from app.repositories.documents import (
+    create_document,
+    delete_document,
+    get_document_by_id,
+    list_documents,
+)
 from app.schemas.auth import CurrentUser
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.services.storage import save_upload
@@ -56,3 +61,31 @@ def get_documents(
         items=[DocumentResponse.from_orm_obj(d) for d in items],
         total=total,
     )
+
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+def get_document(
+    document_id: int,
+    _current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> DocumentResponse:
+    """Get a single document by ID."""
+    doc = get_document_by_id(document_id)
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
+    return DocumentResponse.from_orm_obj(doc)
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_document(
+    document_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> None:
+    """Delete a document and its chunks (cascaded). Admin only."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="仅管理员可删除文档",
+        )
+    ok = delete_document(document_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")

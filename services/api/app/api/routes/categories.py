@@ -34,7 +34,12 @@ def get_categories(
     """列出所有分类（所有登录用户可访问）。"""
     cats = list_categories(db)
     return CategoryListResponse(
-        items=[CategoryResponse.from_orm_obj(c) for c in cats],
+        items=[
+            CategoryResponse.from_orm_obj(
+                c, documents_count=count_documents_in_category(db, c.id)
+            )
+            for c in cats
+        ],
     )
 
 
@@ -103,17 +108,12 @@ def delete_category_route(
     _admin: Annotated[CurrentUser, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, str]:
-    """删除分类（仅管理员）。有文档的分类不允许删除。"""
+    """删除分类（仅管理员）。会级联删除所有子分类及下属全部文档。"""
     cat = get_category_by_id(db, category_id)
     if cat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="分类不存在")
 
     doc_count = count_documents_in_category(db, category_id)
-    if doc_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"该分类下有 {doc_count} 篇文档，请先移动或删除文档后再删除分类",
-        )
 
     delete_category(db, cat)
-    return {"message": "分类已删除"}
+    return {"message": f"分类已删除，同时删除了 {doc_count} 篇关联文档"}

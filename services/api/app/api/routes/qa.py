@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
 from app.models.chat import ChatMessage, ChatSession, Citation
+from app.models.document import KnowledgeDocument
+from app.models.category import KnowledgeCategory
 from app.models.document_chunk import DocumentChunk
 from app.repositories.llm_config import get_active_llm_config, get_llm_config
 from app.schemas.auth import CurrentUser
@@ -106,16 +108,72 @@ def _resolve_llm(llm_config_id: int | None) -> Any:
         raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
 
+def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
+    """Given a list of category IDs, return all IDs including descendants."""
+    all_cats = db.query(KnowledgeCategory).all()
+    children_map: dict[int, list[int]] = {}
+    for c in all_cats:
+        if c.parent_id is not None:
+            children_map.setdefault(c.parent_id, []).append(c.id)
+
+    result: set[int] = set()
+    stack = list(category_ids)
+    while stack:
+        cid = stack.pop()
+        if cid in result:
+            continue
+        result.add(cid)
+        stack.extend(children_map.get(cid, []))
+    return list(result)
+
+
+def _resolve_target_document_ids(
+    db: Session,
+    category_ids: list[int] | None,
+    document_ids: list[int] | None,
+) -> list[int] | None:
+    """Resolve the set of document IDs for retrieval filtering.
+
+    Returns None if no filtering is needed (search all documents).
+    """
+    has_filter = bool(category_ids) or bool(document_ids)
+    if not has_filter:
+        return None
+
+    target_ids: set[int] = set()
+
+    if category_ids:
+        all_category_ids = _resolve_category_tree(db, category_ids)
+        doc_ids_from_cats = (
+            db.query(KnowledgeDocument.id)
+            .filter(KnowledgeDocument.category_id.in_(all_category_ids))
+            .all()
+        )
+        target_ids.update(row[0] for row in doc_ids_from_cats)
+
+    if document_ids:
+        target_ids.update(document_ids)
+
+    return list(target_ids)
+
+
 def _retrieve_chunks(
     question: str,
     db: Session,
     top_k: int = 5,
+    target_document_ids: list[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve the most relevant document chunks via pgvector ANN search.
 
     Generates an embedding for the question, then performs cosine similarity
     search against the document_chunks table.
+
+    When `target_document_ids` is provided, only chunks belonging to those
+    documents are considered.
     """
+    if target_document_ids == []:
+        return []
+
     provider = settings.embedding_provider
 
     if provider == "huggingface":
@@ -140,8 +198,12 @@ def _retrieve_chunks(
 
     query_embedding = embed_model.embed_query(question)
 
+    query = db.query(DocumentChunk)
+    if target_document_ids is not None:
+        query = query.filter(DocumentChunk.document_id.in_(target_document_ids))
+
     chunks = (
-        db.query(DocumentChunk)
+        query
         .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
         .limit(top_k)
         .all()
@@ -283,9 +345,15 @@ async def ask_question_stream(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
-    # Retrieve relevant chunks via pgvector ANN search
-    retrieved_chunks = _retrieve_chunks(payload.question, db)
+    # Resolve scope filtering (categories → document IDs)
+    target_document_ids = _resolve_target_document_ids(
+        db, payload.category_ids, payload.document_ids,
+    )
 
+    # Retrieve relevant chunks via pgvector ANN search (scoped)
+    retrieved_chunks = _retrieve_chunks(
+        payload.question, db, target_document_ids=target_document_ids,
+    )
     async def _stream_events():
         chunks_received: list[str] = []
         citation_list: list[dict] = []
@@ -326,7 +394,7 @@ async def ask_question_stream(
                                 chunk_id=c.get("chunk_id", 0),
                                 locator=c.get("locator", ""),
                                 quoted_text_preview=c.get("quoted_text_preview", ""),
-                                rank=1,
+                                rank=c.get("rank", 0),
                             )
                         )
 
@@ -352,7 +420,7 @@ async def ask_question_stream(
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
         },
     )

@@ -12,6 +12,8 @@ from app.services.prompt_composer import compose_prompt
 
 logger = logging.getLogger(__name__)
 
+INSUFFICIENT_EVIDENCE_ANSWER = "知识库中没有找到足够的信息来回答这个问题。"
+
 
 @dataclass
 class RagResult:
@@ -29,8 +31,10 @@ def _build_citations(
             "document_id": chunk["document_id"],
             "chunk_id": chunk["chunk_id"],
             "locator": chunk["locator"],
+            "quoted_text_preview": chunk["text"][:240],
+            "rank": rank,
         }
-        for chunk in retrieved_chunks
+        for rank, chunk in enumerate(retrieved_chunks, start=1)
     ]
 
 
@@ -45,7 +49,7 @@ def answer_question(
     if not retrieved_chunks:
         return RagResult(
             status="insufficient_evidence",
-            answer="The approved knowledge base does not contain enough evidence to answer this question.",
+            answer=INSUFFICIENT_EVIDENCE_ANSWER,
             citations=[],
         )
 
@@ -87,6 +91,7 @@ async def answer_question_stream(
         {"type": "error", "message": "..."}
     """
     if not retrieved_chunks:
+        yield {"type": "chunk", "text": INSUFFICIENT_EVIDENCE_ANSWER}
         yield {"type": "done", "status": "insufficient_evidence"}
         return
 

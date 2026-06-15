@@ -11,21 +11,8 @@ class AskRequest(BaseModel):
     question: str
     session_id: int | None = None  # None → create a new session
     llm_config_id: int | None = None  # None → use active config
-
-
-class CitationItem(BaseModel):
-    document_id: int
-    chunk_id: int
-    locator: str
-    quoted_text_preview: str | None = None
-
-
-class AskResponse(BaseModel):
-    session_id: int
-    message_id: int
-    status: str
-    answer: str
-    citations: list[CitationItem]
+    category_ids: list[int] | None = None  # None / [] → search all categories
+    document_ids: list[int] | None = None  # None / [] → search all documents
 
 
 # ── Session list / detail ─────────────────────────────────────────────
@@ -51,12 +38,3 @@ class ChatSessionOut(BaseModel):
 
 class ChatSessionDetail(ChatSessionOut):
     messages: list[ChatMessageOut] = []
-
-
-class CreateSessionRequest(BaseModel):
-    title: str | None = None
-
-
-class CreateSessionResponse(BaseModel):
-    id: int
-    title: str | None = None

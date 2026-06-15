@@ -4,6 +4,7 @@ from typing import Any
 
 from app.db.session import SessionLocal
 from app.models.document import KnowledgeDocument
+from app.services.storage import delete_upload
 
 
 def get_document_by_id(document_id: int) -> KnowledgeDocument | None:
@@ -60,5 +61,19 @@ def list_documents(
         total = query.count()
         items = query.order_by(KnowledgeDocument.id.desc()).offset(offset).limit(limit).all()
         return items, total
+    finally:
+        db.close()
+
+
+def delete_document(document_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
+        if doc is None:
+            return False
+        delete_upload(doc.storage_path)
+        db.delete(doc)
+        db.commit()
+        return True
     finally:
         db.close()

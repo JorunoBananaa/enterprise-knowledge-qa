@@ -132,7 +132,7 @@ export default function LLMConfigPage() {
     data: configs = [],
     loading,
     run: fetchConfigs,
-  } = useApi<LLMConfigItem[]>("/llm-configs/");
+  } = useApi<LLMConfigItem[]>("/llm-configs");
 
   const activeConfig = useMemo(
     () => configs.find((c) => c.is_active),
@@ -183,7 +183,7 @@ export default function LLMConfigPage() {
     message.error(err instanceof Error ? err.message : "操作失败");
   };
 
-  const { loading: creating, run: createConfig } = useApi("/llm-configs/", {
+  const { loading: creating, run: createConfig } = useApi("/llm-configs", {
     method: "POST",
     manual: true,
     onSuccess: onMutateSuccess,
@@ -424,7 +424,9 @@ export default function LLMConfigPage() {
                   danger
                   icon={<DeleteOutlined />}
                   loading={deletingId === record.id}
-                />
+                >
+                  删除
+                </Button>
               </Popconfirm>
             </Space>
           );
