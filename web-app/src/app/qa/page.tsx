@@ -8,7 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import {
   Button,
   Card,
@@ -142,6 +145,31 @@ function buildCatTree(items: CategoryItem[]): CatTreeNode[] {
   return roots;
 }
 
+function replaceCurrentSessionUrl(sessionId: number) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("session_id", String(sessionId));
+  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
+
+function MarkdownAnswer({ content }: { content: string }) {
+  return (
+    <div className="qa-answer-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noreferrer">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 // ── component ────────────────────────────────────────────────────────
 
 export default function QAPage() {
@@ -162,8 +190,8 @@ export default function QAPage() {
 
 function QAPageContent() {
   const { token } = theme.useToken();
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionIdParam = searchParams.get("session_id");
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessageOut[]>([]);
@@ -173,6 +201,7 @@ function QAPageContent() {
     undefined,
   );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const localSessionUrlSyncRef = useRef<number | null>(null);
 
   // ── scope selection ──
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -233,10 +262,11 @@ function QAPageContent() {
   );
 
   useEffect(() => {
-    const rawSessionId = searchParams.get("session_id");
+    const rawSessionId = sessionIdParam;
     if (!rawSessionId) {
       setActiveId(null);
       setMessages([]);
+      localSessionUrlSyncRef.current = null;
       return;
     }
 
@@ -244,12 +274,18 @@ function QAPageContent() {
     if (!Number.isFinite(nextSessionId)) {
       setActiveId(null);
       setMessages([]);
+      localSessionUrlSyncRef.current = null;
       return;
     }
 
     setActiveId(nextSessionId);
+    if (localSessionUrlSyncRef.current === nextSessionId) {
+      localSessionUrlSyncRef.current = null;
+      return;
+    }
+
     loadMessages(nextSessionId);
-  }, [searchParams, loadMessages]);
+  }, [sessionIdParam, loadMessages]);
 
   // ── ask question (streaming) ────────────────────────────────────
 
@@ -325,8 +361,9 @@ function QAPageContent() {
 
             // If this is a brand-new session, set it active
             if (!activeId && sessionId != null) {
+              localSessionUrlSyncRef.current = sessionId;
               setActiveId(sessionId);
-              router.replace(`/qa?session_id=${sessionId}`);
+              replaceCurrentSessionUrl(sessionId);
               await loadSessions();
               window.dispatchEvent(new Event("qa:sessions-updated"));
             }
@@ -539,16 +576,7 @@ function QAPageContent() {
                                 borderRadius: `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px`,
                               }}
                             >
-                              <Paragraph
-                                style={{
-                                  marginBottom: 0,
-                                  whiteSpace: "pre-wrap",
-                                  color: token.colorText,
-                                  lineHeight: 1.75,
-                                }}
-                              >
-                                {msg.answer}
-                              </Paragraph>
+                              <MarkdownAnswer content={msg.answer} />
                             </Card>
                             <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out">
                               <Button

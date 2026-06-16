@@ -193,6 +193,117 @@ textarea.ant-input:not(.ant-input-disabled),
   color: inherit !important;
 }
 
+/* ── QA Markdown answer ───────────────────────────────────────── */
+.qa-answer-markdown {
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.qa-answer-markdown > :first-child {
+  margin-top: 0;
+}
+
+.qa-answer-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.qa-answer-markdown p,
+.qa-answer-markdown ul,
+.qa-answer-markdown ol,
+.qa-answer-markdown blockquote,
+.qa-answer-markdown pre,
+.qa-answer-markdown table {
+  margin: 0 0 12px;
+}
+
+.qa-answer-markdown h1,
+.qa-answer-markdown h2,
+.qa-answer-markdown h3,
+.qa-answer-markdown h4 {
+  margin: 16px 0 8px;
+  color: #111827;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.qa-answer-markdown h1 {
+  font-size: 20px;
+}
+
+.qa-answer-markdown h2 {
+  font-size: 18px;
+}
+
+.qa-answer-markdown h3 {
+  font-size: 16px;
+}
+
+.qa-answer-markdown h4 {
+  font-size: 15px;
+}
+
+.qa-answer-markdown ul,
+.qa-answer-markdown ol {
+  padding-left: 22px;
+}
+
+.qa-answer-markdown li {
+  margin: 4px 0;
+}
+
+.qa-answer-markdown li > p {
+  margin: 0;
+}
+
+.qa-answer-markdown blockquote {
+  border-left: 3px solid #d1d5db;
+  color: #4b5563;
+  padding-left: 12px;
+}
+
+.qa-answer-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #111827;
+  padding: 12px 14px;
+}
+
+.qa-answer-markdown pre code {
+  background: transparent;
+  color: #f9fafb;
+  padding: 0;
+}
+
+.qa-answer-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.qa-answer-markdown th,
+.qa-answer-markdown td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.qa-answer-markdown th {
+  background: #f8fafc;
+  color: #111827;
+  font-weight: 700;
+}
+
+.qa-answer-markdown a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ── Animations (used via inline style/animation) ──────────────── */
 @keyframes fadeInUp {
   from {
