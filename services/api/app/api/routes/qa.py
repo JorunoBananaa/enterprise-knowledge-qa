@@ -15,6 +15,7 @@ from app.models.document import KnowledgeDocument
 from app.models.category import KnowledgeCategory
 from app.models.document_chunk import DocumentChunk
 from app.repositories.llm_config import get_active_llm_config, get_llm_config
+from app.repositories.prompts import get_system_prompt_content, get_user_prompt
 from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
     AskRequest,
@@ -27,6 +28,9 @@ from app.services.llm_factory import create_chat_model
 from app.services.rag import answer_question_stream
 
 router = APIRouter()
+
+DEFAULT_SYSTEM_PROMPT = "请根据公司知识库回答。回答应简洁有用。"
+CHAT_HISTORY_LIMIT = 6
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -106,6 +110,32 @@ def _resolve_llm(llm_config_id: int | None) -> Any:
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
+
+
+def _resolve_prompts(user_id: int) -> tuple[str, str | None]:
+    """Resolve configured system prompt and user answer preferences."""
+    system_prompt = get_system_prompt_content().strip() or DEFAULT_SYSTEM_PROMPT
+    user_prompt = get_user_prompt(user_id).strip() or None
+    return system_prompt, user_prompt
+
+
+def _load_chat_history(
+    session_id: int,
+    db: Session,
+    limit: int = CHAT_HISTORY_LIMIT,
+) -> list[dict[str, str]]:
+    """Load recent session turns in chronological order."""
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {"question": row.question, "answer": row.answer}
+        for row in reversed(rows)
+    ]
 
 
 def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
@@ -354,6 +384,9 @@ async def ask_question_stream(
     retrieved_chunks = _retrieve_chunks(
         payload.question, db, target_document_ids=target_document_ids,
     )
+    system_prompt, user_prompt = _resolve_prompts(current_user.id)
+    chat_history = _load_chat_history(session.id, db)
+
     async def _stream_events():
         chunks_received: list[str] = []
         citation_list: list[dict] = []
@@ -362,9 +395,10 @@ async def ask_question_stream(
             async for event in answer_question_stream(
                 question=payload.question,
                 retrieved_chunks=retrieved_chunks,
-                system_prompt="请根据公司知识库回答。回答应简洁有用。",
-                user_prompt=None,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
                 llm=llm,
+                chat_history=chat_history,
             ):
                 if event["type"] == "chunk":
                     chunks_received.append(event["text"])

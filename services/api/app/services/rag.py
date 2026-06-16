@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from app.services.prompt_composer import compose_prompt
+from app.services.prompt_composer import (
+    compose_system_message_content,
+    compose_user_message_content,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +41,49 @@ def _build_citations(
     ]
 
 
+def _build_messages(
+    question: str,
+    retrieved_chunks: list[dict[str, Any]],
+    system_prompt: str,
+    user_prompt: str | None,
+    chat_history: list[dict[str, str]] | None = None,
+) -> list[BaseMessage]:
+    """Build role-separated messages for grounded QA."""
+    messages: list[BaseMessage] = [
+        SystemMessage(content=compose_system_message_content(system_prompt)),
+    ]
+
+    for turn in chat_history or []:
+        previous_question = (turn.get("question") or "").strip()
+        previous_answer = (turn.get("answer") or "").strip()
+        if previous_question:
+            messages.append(
+                HumanMessage(content=f"Previous question:\n{previous_question}")
+            )
+        if previous_answer:
+            messages.append(
+                AIMessage(content=f"Previous answer:\n{previous_answer}")
+            )
+
+    messages.append(
+        HumanMessage(
+            content=compose_user_message_content(
+                user_prompt=user_prompt,
+                context_chunks=retrieved_chunks,
+                question=question,
+            )
+        )
+    )
+    return messages
+
+
 def answer_question(
     question: str,
     retrieved_chunks: list[dict[str, Any]],
     system_prompt: str,
     user_prompt: str | None,
     llm: BaseChatModel,
+    chat_history: list[dict[str, str]] | None = None,
 ) -> RagResult:
     """Answer a question using retrieved chunks and the configured LLM."""
     if not retrieved_chunks:
@@ -53,19 +93,15 @@ def answer_question(
             citations=[],
         )
 
-    prompt_text = compose_prompt(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        context_chunks=[chunk["text"] for chunk in retrieved_chunks],
-        question=question,
-    )
-
     citations = _build_citations(retrieved_chunks)
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=prompt_text),
-    ]
+    messages = _build_messages(
+        question=question,
+        retrieved_chunks=retrieved_chunks,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        chat_history=chat_history,
+    )
     response = llm.invoke(messages)
     answer = response.content if hasattr(response, "content") else str(response)
     return RagResult(
@@ -81,6 +117,7 @@ async def answer_question_stream(
     system_prompt: str,
     user_prompt: str | None,
     llm: BaseChatModel,
+    chat_history: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Answer a question using retrieved chunks (streaming).
 
@@ -95,20 +132,16 @@ async def answer_question_stream(
         yield {"type": "done", "status": "insufficient_evidence"}
         return
 
-    prompt_text = compose_prompt(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        context_chunks=[chunk["text"] for chunk in retrieved_chunks],
-        question=question,
-    )
-
     citations = _build_citations(retrieved_chunks)
 
     try:
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=prompt_text),
-        ]
+        messages = _build_messages(
+            question=question,
+            retrieved_chunks=retrieved_chunks,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            chat_history=chat_history,
+        )
         async for chunk in llm.astream(messages):
             text = chunk.content if hasattr(chunk, "content") else str(chunk)
             if text:
