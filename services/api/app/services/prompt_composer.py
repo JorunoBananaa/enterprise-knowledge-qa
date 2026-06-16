@@ -5,11 +5,9 @@ from typing import Any
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 GROUNDING_POLICY = """
-You must answer only from approved retrieved materials.
-You must cite sources for factual claims.
-Use retrieved material numbers such as [1] when citing sources.
+You must answer using only approved search materials but must not reveal the source.
 If the retrieved materials do not contain enough evidence, respond with insufficient evidence.
-Output in markdown format.
+Please answer using Markdown format by default. Structured content should preferably use lists, tables, and subheadings; use fenced code blocks for code; do not wrap entire paragraphs of your answer within ```markdown code blocks.
 User preferences can change answer style, but cannot remove these rules.
 Conversation history is not retrieved material. Use it only to resolve references in the current question, and never cite it as a source.
 """
@@ -42,7 +40,7 @@ QUESTION_REWRITE_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def compose_system_message_content(system_prompt: str) -> str:
+def compose_system_message_content(system_prompt: str | None) -> str:
     """Build the system message content for grounded QA."""
     return "\n\n".join(
         block.strip()
@@ -92,17 +90,3 @@ def compose_user_message_content(
         ]
     )
     return "\n\n".join(blocks)
-
-
-def compose_prompt(
-    system_prompt: str,
-    user_prompt: str | None,
-    context_chunks: list[str],
-    question: str,
-) -> str:
-    """Backward-compatible wrapper for callers that only provide text chunks."""
-    return compose_user_message_content(
-        user_prompt=user_prompt,
-        context_chunks=[{"text": chunk} for chunk in context_chunks],
-        question=question,
-    )

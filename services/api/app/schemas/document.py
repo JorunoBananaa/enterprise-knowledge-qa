@@ -35,7 +35,3 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
     total: int
-
-
-class ReviewAction(BaseModel):
-    reason: str | None = None

@@ -18,10 +18,5 @@ class LoginResponse(BaseModel):
     user: CurrentUser
 
 
-class PasswordChangeRequest(BaseModel):
-    current_password: str
-    new_password: str
-
-
 class MessageResponse(BaseModel):
     detail: str

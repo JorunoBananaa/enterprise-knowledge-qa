@@ -122,7 +122,6 @@ enterprise-knowledge-qa/
         │
         ├── components/                 # 通用组件
         │   ├── AppShell.tsx            # 应用外壳（侧边栏 + 用户状态 + 路由）
-        │   ├── CitationList.tsx        # 回答引用来源列表
         │   ├── DocumentStatusBadge.tsx  # 文档状态标签
         │   ├── LoadingSpinner.tsx      # 加载动画
         │   ├── PageHeader.tsx          # 页面标题栏

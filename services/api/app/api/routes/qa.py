@@ -29,7 +29,6 @@ from app.services.rag import answer_question_stream, rewrite_question_for_retrie
 
 router = APIRouter()
 
-DEFAULT_SYSTEM_PROMPT = "请根据公司知识库回答。回答应简洁有用。"
 CHAT_HISTORY_LIMIT = 6
 
 
@@ -112,9 +111,9 @@ def _resolve_llm(llm_config_id: int | None) -> Any:
         raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
 
-def _resolve_prompts(user_id: int) -> tuple[str, str | None]:
+def _resolve_prompts(user_id: int) -> tuple[str | None, str | None]:
     """Resolve configured system prompt and user answer preferences."""
-    system_prompt = get_system_prompt_content().strip() or DEFAULT_SYSTEM_PROMPT
+    system_prompt = get_system_prompt_content().strip() or None
     user_prompt = get_user_prompt(user_id).strip() or None
     return system_prompt, user_prompt
 

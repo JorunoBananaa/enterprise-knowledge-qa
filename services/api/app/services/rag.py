@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -19,13 +18,6 @@ from app.services.prompt_composer import (
 logger = logging.getLogger(__name__)
 
 INSUFFICIENT_EVIDENCE_ANSWER = "知识库中没有找到足够的信息来回答这个问题。"
-
-
-@dataclass
-class RagResult:
-    status: str
-    answer: str
-    citations: list[dict[str, Any]]
 
 
 def _build_citations(
@@ -62,7 +54,7 @@ def _history_to_messages(
 def _build_answer_prompt_input(
     question: str,
     retrieved_chunks: list[dict[str, Any]],
-    system_prompt: str,
+    system_prompt: str | None,
     user_prompt: str | None,
     chat_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
@@ -76,26 +68,6 @@ def _build_answer_prompt_input(
             question=question,
         ),
     }
-
-
-def _build_messages(
-    question: str,
-    retrieved_chunks: list[dict[str, Any]],
-    system_prompt: str,
-    user_prompt: str | None,
-    chat_history: list[dict[str, str]] | None = None,
-) -> list[BaseMessage]:
-    """Render the answer prompt into LangChain messages."""
-    prompt_value = ANSWER_PROMPT.invoke(
-        _build_answer_prompt_input(
-            question=question,
-            retrieved_chunks=retrieved_chunks,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            chat_history=chat_history,
-        )
-    )
-    return prompt_value.to_messages()
 
 
 def _clean_rewritten_question(raw_question: str, fallback_question: str) -> str:
@@ -137,46 +109,10 @@ async def rewrite_question_for_retrieval(
         return question
 
 
-def answer_question(
-    question: str,
-    retrieved_chunks: list[dict[str, Any]],
-    system_prompt: str,
-    user_prompt: str | None,
-    llm: BaseChatModel,
-    chat_history: list[dict[str, str]] | None = None,
-) -> RagResult:
-    """Answer a question using retrieved chunks and the configured LLM."""
-    if not retrieved_chunks:
-        return RagResult(
-            status="insufficient_evidence",
-            answer=INSUFFICIENT_EVIDENCE_ANSWER,
-            citations=[],
-        )
-
-    citations = _build_citations(retrieved_chunks)
-
-    chain = ANSWER_PROMPT | llm
-    response = chain.invoke(
-        _build_answer_prompt_input(
-            question=question,
-            retrieved_chunks=retrieved_chunks,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            chat_history=chat_history,
-        )
-    )
-    answer = response.content if hasattr(response, "content") else str(response)
-    return RagResult(
-        status="answered",
-        answer=str(answer),
-        citations=citations,
-    )
-
-
 async def answer_question_stream(
     question: str,
     retrieved_chunks: list[dict[str, Any]],
-    system_prompt: str,
+    system_prompt: str | None,
     user_prompt: str | None,
     llm: BaseChatModel,
     chat_history: list[dict[str, str]] | None = None,
