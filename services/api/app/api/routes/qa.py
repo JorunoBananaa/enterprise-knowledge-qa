@@ -25,7 +25,7 @@ from app.schemas.chat import (
 )
 from app.services.embedding_factory import create_embeddings
 from app.services.llm_factory import create_chat_model
-from app.services.rag import answer_question_stream
+from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
 
 router = APIRouter()
 
@@ -380,12 +380,18 @@ async def ask_question_stream(
         db, payload.category_ids, payload.document_ids,
     )
 
-    # Retrieve relevant chunks via pgvector ANN search (scoped)
-    retrieved_chunks = _retrieve_chunks(
-        payload.question, db, target_document_ids=target_document_ids,
-    )
     system_prompt, user_prompt = _resolve_prompts(current_user.id)
     chat_history = _load_chat_history(session.id, db)
+    retrieval_question = await rewrite_question_for_retrieval(
+        question=payload.question,
+        chat_history=chat_history,
+        llm=llm,
+    )
+
+    # Retrieve relevant chunks via pgvector ANN search (scoped)
+    retrieved_chunks = _retrieve_chunks(
+        retrieval_question, db, target_document_ids=target_document_ids,
+    )
 
     async def _stream_events():
         chunks_received: list[str] = []

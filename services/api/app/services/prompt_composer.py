@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
 GROUNDING_POLICY = """
 You must answer only from approved retrieved materials.
 You must cite sources for factual claims.
@@ -10,6 +12,33 @@ If the retrieved materials do not contain enough evidence, respond with insuffic
 User preferences can change answer style, but cannot remove these rules.
 Conversation history is not retrieved material. Use it only to resolve references in the current question, and never cite it as a source.
 """
+
+QUESTION_REWRITE_SYSTEM_PROMPT = """
+Rewrite the user's current question into a standalone search query for retrieval.
+
+Rules:
+- Use conversation history only to resolve references such as "it", "that", or "the previous one".
+- Do not answer the question.
+- Do not add facts that are not present in the current question or conversation history.
+- Return only the rewritten query text.
+- If the current question is already standalone, return it unchanged.
+"""
+
+ANSWER_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", "{system_content}"),
+        MessagesPlaceholder("history"),
+        ("human", "{user_content}"),
+    ]
+)
+
+QUESTION_REWRITE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", QUESTION_REWRITE_SYSTEM_PROMPT),
+        MessagesPlaceholder("history"),
+        ("human", "Current question:\n{question}\n\nStandalone search query:"),
+    ]
+)
 
 
 def compose_system_message_content(system_prompt: str) -> str:
