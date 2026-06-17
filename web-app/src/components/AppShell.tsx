@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -76,7 +83,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     loading: sessionsLoading,
     run: loadQaSessions,
   } = useApi<SessionItem[]>("/qa/sessions", {
-    refreshDeps: [!!user],
+    ready: Boolean(user),
+    refreshDeps: [Boolean(user)],
   });
 
   // ── delete session ──
@@ -105,9 +113,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const currentSessionIdRef = useRef<string | null>(null);
 
   // Callback for SessionHistoryBlock to update the ref
-  const handleCurrentSessionIdChange = (id: string | null) => {
+  const handleCurrentSessionIdChange = useCallback((id: string | null) => {
     currentSessionIdRef.current = id;
-  };
+  }, []);
 
   // ── logout ──
   const { run: handleLogout } = useRequest(
@@ -198,7 +206,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return items;
-  }, [user]);
+  }, [user?.role]);
 
   if (pathname === "/login") {
     return <App>{children}</App>;

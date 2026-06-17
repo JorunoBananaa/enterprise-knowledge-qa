@@ -29,10 +29,15 @@ export default function PromptPanel({
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
-  const { loading } = useRequest(async () => {
-    const data = await apiFetch<{ content: string }>(endpoint);
-    form.setFieldsValue({ content: data.content || "" });
-  });
+  const { loading } = useRequest(
+    () => apiFetch<{ content: string }>(endpoint),
+    {
+      refreshDeps: [endpoint],
+      onSuccess: (data) => {
+        form.setFieldsValue({ content: data.content || "" });
+      },
+    },
+  );
 
   const { loading: saving, run: handleSave } = useApi(endpoint, {
     method: "PUT",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Form,
   Input,
@@ -31,13 +31,11 @@ import {
   StarOutlined,
   KeyOutlined,
   GlobalOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   WifiOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
 import { useApi } from "@/lib/use-api";
-import { omit, maskString } from "@/lib/utils";
+import { omit } from "@/lib/utils";
 import PageHeader from "@/components/PageHeader";
 
 const { Text } = Typography;
@@ -123,7 +121,6 @@ export default function LLMConfigPage() {
   const [testingId, setTestingId] = useState<number | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
@@ -138,15 +135,19 @@ export default function LLMConfigPage() {
     () => configs.find((c) => c.is_active),
     [configs],
   );
+  const providerCount = useMemo(
+    () => new Set(configs.map((config) => config.provider)).size,
+    [configs],
+  );
 
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingId(null);
     form.resetFields();
     form.setFieldsValue(DEFAULT_FORM_VALUES);
     setModalOpen(true);
-  };
+  }, [form]);
 
-  const openEdit = (record: LLMConfigItem) => {
+  const openEdit = useCallback((record: LLMConfigItem) => {
     setEditingId(record.id);
     form.setFieldsValue({
       name: record.name,
@@ -156,22 +157,14 @@ export default function LLMConfigPage() {
       base_url: record.base_url || "",
     });
     setModalOpen(true);
-  };
+  }, [form]);
 
-  const handleProviderChange = (provider: string) => {
+  const handleProviderChange = useCallback((provider: string) => {
     const meta = PROVIDER_META[provider];
     if (meta) {
       form.setFieldsValue({ model_name: meta.model, base_url: meta.baseUrl });
     }
-  };
-
-  const toggleKeyVisibility = (id: number) => {
-    setVisibleKeys((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  }, [form]);
 
   // ── submit (create / edit) ──
   const onMutateSuccess = () => {
@@ -238,13 +231,13 @@ export default function LLMConfigPage() {
     },
   );
 
-  const doActivate = (id: number) => {
+  const doActivate = useCallback((id: number) => {
     setActivatingId(id);
     handleActivate(id);
-  };
+  }, [handleActivate]);
 
   // ── test connectivity ──
-  const { loading: testing, run: runTest } = useApi(
+  const { run: runTest } = useApi(
     (id: number) => `/llm-configs/${id}/test`,
     {
       method: "POST",
@@ -261,10 +254,10 @@ export default function LLMConfigPage() {
     },
   );
 
-  const handleTest = (id: number) => {
+  const handleTest = useCallback((id: number) => {
     setTestingId(id);
     runTest(id);
-  };
+  }, [runTest]);
 
   // ── delete ──
   const { run: handleDelete } = useApi((id: number) => `/llm-configs/${id}`, {
@@ -282,10 +275,10 @@ export default function LLMConfigPage() {
     },
   });
 
-  const doDelete = (id: number) => {
+  const doDelete = useCallback((id: number) => {
     setDeletingId(id);
     handleDelete(id);
-  };
+  }, [handleDelete]);
 
   const columns = useMemo(
     () => [
@@ -437,12 +430,10 @@ export default function LLMConfigPage() {
       testingId,
       activatingId,
       deletingId,
-      visibleKeys,
       doActivate,
       handleTest,
       openEdit,
       doDelete,
-      toggleKeyVisibility,
     ],
   );
 
@@ -480,7 +471,7 @@ export default function LLMConfigPage() {
           <Card size="small" className="!rounded-xl" style={{ height: "100%" }}>
             <Statistic
               title="供应商数"
-              value={new Set(configs.map((c) => c.provider)).size}
+              value={providerCount}
               prefix={<GlobalOutlined className="!text-green-500" />}
             />
           </Card>

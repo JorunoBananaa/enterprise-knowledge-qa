@@ -27,6 +27,12 @@ def _build_citations(
     return [
         {
             "document_id": chunk["document_id"],
+            "document_title": chunk.get("document_title"),
+            "document_name": chunk.get("document_name"),
+            "document_file_type": chunk.get("document_file_type"),
+            "document_storage_path": chunk.get("document_storage_path"),
+            "document_path": chunk.get("document_path"),
+            "document_category_id": chunk.get("document_category_id"),
             "chunk_id": chunk["chunk_id"],
             "locator": chunk["locator"],
             "quoted_text_preview": chunk["text"][:240],

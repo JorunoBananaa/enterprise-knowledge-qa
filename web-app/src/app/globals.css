@@ -18,8 +18,7 @@ code {
 /* ── Cursor ───────────────────────────────────────────────────── */
 a,
 button,
-[role="button"],
-[tabindex]:not([tabindex="-1"]) {
+[role="button"] {
   cursor: pointer;
 }
 

@@ -1,17 +1,15 @@
 /**
- * 通用工具函数 —— 基于 lodash 封装
+ * 通用工具函数 —— 基于 lodash 子路径导入，避免拉入 lodash barrel。
  */
-import {
-  debounce as _debounce,
-  throttle as _throttle,
-  omit as _omit,
-  pick as _pick,
-  isEqual as _isEqual,
-  cloneDeep as _cloneDeep,
-  uniqBy as _uniqBy,
-  groupBy as _groupBy,
-  sortBy as _sortBy,
-} from "lodash";
+import _debounce from "lodash/debounce";
+import _throttle from "lodash/throttle";
+import _omit from "lodash/omit";
+import _pick from "lodash/pick";
+import _isEqual from "lodash/isEqual";
+import _cloneDeep from "lodash/cloneDeep";
+import _uniqBy from "lodash/uniqBy";
+import _groupBy from "lodash/groupBy";
+import _sortBy from "lodash/sortBy";
 
 // ── 防抖 / 节流 ──────────────────────────────────────────────
 

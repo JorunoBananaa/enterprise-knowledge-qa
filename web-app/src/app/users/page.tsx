@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -85,10 +85,12 @@ export default function UsersPage() {
     [],
   );
 
-  const handleSearchChange = (value: string) => {
+  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
+
+  const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     debouncedSearch(value);
-  };
+  }, [debouncedSearch]);
 
   // ── fetch users ─────────────────────────────────────────────
   const {
@@ -105,7 +107,7 @@ export default function UsersPage() {
       return `/users?${params.toString()}`;
     },
     {
-      refreshDeps: [pagination, submittedSearch],
+      refreshDeps: [pagination.offset, pagination.limit, submittedSearch],
       onError: (err) => {
         message.error(err instanceof Error ? err.message : "加载用户列表失败");
       },
@@ -132,14 +134,14 @@ export default function UsersPage() {
   };
 
   // ── edit ──
-  const openEdit = (user: UserItem) => {
+  const openEdit = useCallback((user: UserItem) => {
     setEditUser(user);
     editForm.setFieldsValue({
       display_name: user.display_name,
       role: user.role,
       status: user.status,
     });
-  };
+  }, [editForm]);
 
   const { loading: updating, run: doUpdate } = useApi(
     (id: number) => `/users/${id}`,
@@ -168,10 +170,10 @@ export default function UsersPage() {
   };
 
   // ── reset password ──
-  const openResetPassword = (user: UserItem) => {
+  const openResetPassword = useCallback((user: UserItem) => {
     setResetPasswordUser(user);
     pwdForm.resetFields();
-  };
+  }, [pwdForm]);
 
   const { loading: resetting, run: doResetPassword } = useApi(
     (id: number) => `/users/${id}/reset-password`,
@@ -215,11 +217,11 @@ export default function UsersPage() {
     },
   });
 
-  const handleToggleDisable = (user: UserItem) => {
+  const handleToggleDisable = useCallback((user: UserItem) => {
     const newStatus = user.status === "active" ? "disabled" : "active";
     setTogglingId(user.id);
     toggleDisable(user.id, { status: newStatus });
-  };
+  }, [toggleDisable]);
 
   const columns = useMemo(
     () => [

@@ -19,6 +19,7 @@ from app.repositories.prompts import get_system_prompt_content, get_user_prompt
 from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
     AskRequest,
+    CitationOut,
     ChatMessageOut,
     ChatSessionDetail,
     ChatSessionOut,
@@ -156,6 +157,32 @@ def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
     return list(result)
 
 
+def _build_category_path_map(db: Session) -> dict[int, str]:
+    """Build display paths for all knowledge categories."""
+    categories = db.query(KnowledgeCategory).all()
+    category_by_id = {category.id: category for category in categories}
+
+    def build_path(category_id: int) -> str:
+        names: list[str] = []
+        seen: set[int] = set()
+        current = category_by_id.get(category_id)
+        while current is not None and current.id not in seen:
+            seen.add(current.id)
+            names.append(current.name)
+            current = (
+                category_by_id.get(current.parent_id)
+                if current.parent_id is not None
+                else None
+            )
+        return " / ".join(reversed(names))
+
+    return {
+        category_id: path
+        for category_id in category_by_id
+        if (path := build_path(category_id))
+    }
+
+
 def _resolve_target_document_ids(
     db: Session,
     category_ids: list[int] | None,
@@ -227,25 +254,37 @@ def _retrieve_chunks(
 
     query_embedding = embed_model.embed_query(question)
 
-    query = db.query(DocumentChunk)
+    query = db.query(DocumentChunk, KnowledgeDocument).join(
+        KnowledgeDocument,
+        KnowledgeDocument.id == DocumentChunk.document_id,
+    )
     if target_document_ids is not None:
         query = query.filter(DocumentChunk.document_id.in_(target_document_ids))
 
-    chunks = (
+    rows = (
         query
         .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
         .limit(top_k)
         .all()
     )
+    if not rows:
+        return []
 
+    category_paths = _build_category_path_map(db)
     return [
         {
             "chunk_id": chunk.id,
             "document_id": chunk.document_id,
+            "document_title": document.title,
+            "document_name": document.title,
+            "document_file_type": document.file_type,
+            "document_storage_path": document.storage_path,
+            "document_path": category_paths.get(document.category_id),
+            "document_category_id": document.category_id,
             "locator": chunk.locator,
             "text": chunk.text,
         }
-        for chunk in chunks
+        for chunk, document in rows
     ]
 
 
@@ -304,13 +343,61 @@ def get_session(
         .order_by(ChatMessage.created_at.asc())
         .all()
     )
+
+    citation_map: dict[int, list[CitationOut]] = {}
+    message_ids = [m.id for m in messages]
+    if message_ids:
+        citation_rows = (
+            db.query(Citation, KnowledgeDocument)
+            .outerjoin(
+                KnowledgeDocument,
+                KnowledgeDocument.id == Citation.document_id,
+            )
+            .filter(Citation.chat_message_id.in_(message_ids))
+            .order_by(
+                Citation.chat_message_id.asc(),
+                Citation.rank.asc(),
+                Citation.id.asc(),
+            )
+            .all()
+        )
+        category_paths = _build_category_path_map(db) if citation_rows else {}
+
+        for citation, document in citation_rows:
+            citation_map.setdefault(citation.chat_message_id, []).append(
+                CitationOut(
+                    id=citation.id,
+                    document_id=citation.document_id,
+                    document_title=document.title if document else None,
+                    document_name=document.title if document else None,
+                    document_file_type=document.file_type if document else None,
+                    document_storage_path=document.storage_path if document else None,
+                    document_path=(
+                        category_paths.get(document.category_id) if document else None
+                    ),
+                    document_category_id=document.category_id if document else None,
+                    chunk_id=citation.chunk_id,
+                    locator=citation.locator,
+                    quoted_text_preview=citation.quoted_text_preview,
+                    rank=citation.rank,
+                )
+            )
+
     return ChatSessionDetail(
         id=session.id,
         title=session.title,
         created_at=session.created_at,
         message_count=len(messages),
         messages=[
-            ChatMessageOut.model_validate(m) for m in messages
+            ChatMessageOut(
+                id=m.id,
+                question=m.question,
+                answer=m.answer,
+                result_status=m.result_status,
+                created_at=m.created_at,
+                citations=citation_map.get(m.id, []),
+            )
+            for m in messages
         ],
     )
 
@@ -358,7 +445,7 @@ async def ask_question_stream(
 
     Events:
         chunk   → {"text": "…"}
-        citation → {"document_id": …, "chunk_id": …, "locator": …}
+        citation → {"document_id": …, "document_name": …, "document_path": …, "chunk_id": …, "locator": …}
         done    → {"status": "answered", "session_id": …, "message_id": …}
         error   → {"message": "…"}
     """

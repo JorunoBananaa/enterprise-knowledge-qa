@@ -85,6 +85,12 @@ export type StreamEvent =
   | {
       type: "citation";
       document_id: number;
+      document_title?: string;
+      document_name?: string;
+      document_file_type?: string;
+      document_storage_path?: string;
+      document_path?: string;
+      document_category_id?: number;
       chunk_id: number;
       locator: string;
       quoted_text_preview?: string;

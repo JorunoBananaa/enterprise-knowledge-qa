@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Tabs } from "antd";
 import { SettingOutlined, FileTextOutlined } from "@ant-design/icons";
+import { useRequest } from "ahooks";
 import { getCurrentUser } from "@/lib/auth-client";
-import type { CurrentUser } from "@/lib/auth-client";
 import PageHeader from "@/components/PageHeader";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import PromptPanel from "@/components/PromptPanel";
@@ -12,24 +12,14 @@ import PromptPanel from "@/components/PromptPanel";
 // ── Unified Prompt Page ──────────────────────────────────────────────
 
 export default function PromptsPage() {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getCurrentUser()
-      .then((u) => {
-        setUser(u);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  if (loading) return <LoadingSpinner />;
-
+  const { data: user = null, loading } = useRequest(getCurrentUser, {
+    onError: () => {
+      // AppShell owns the global unauthenticated redirect.
+    },
+  });
   const isAdmin = user?.role === "admin";
-
-  const tabItems = [
-    {
+  const tabItems = useMemo(() => {
+    const personalTab = {
       key: "personal",
       label: (
         <span className="flex items-center gap-1.5">
@@ -44,27 +34,32 @@ export default function PromptsPage() {
           placeholder="自定义回答的风格和格式，可为空..."
         />
       ),
-    },
-  ];
+    };
 
-  if (isAdmin) {
-    tabItems.unshift({
-      key: "system",
-      label: (
-        <span className="flex items-center gap-1.5">
-          <SettingOutlined />
-          系统提示词
-        </span>
-      ),
-      children: (
-        <PromptPanel
-          endpoint="/prompts/system"
-          description="系统提示词定义了回答的基础规则，对所有问答生效。"
-          placeholder="请输入系统提示词内容，可为空..."
-        />
-      ),
-    });
-  }
+    if (!isAdmin) return [personalTab];
+
+    return [
+      {
+        key: "system",
+        label: (
+          <span className="flex items-center gap-1.5">
+            <SettingOutlined />
+            系统提示词
+          </span>
+        ),
+        children: (
+          <PromptPanel
+            endpoint="/prompts/system"
+            description="系统提示词定义了回答的基础规则，对所有问答生效。"
+            placeholder="请输入系统提示词内容，可为空..."
+          />
+        ),
+      },
+      personalTab,
+    ];
+  }, [isAdmin]);
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="w-full max-w-[1060px] mx-auto">

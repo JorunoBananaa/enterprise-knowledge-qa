@@ -8,7 +8,12 @@ const nextConfig = {
   reactStrictMode: false,
   skipTrailingSlashRedirect: true,
   experimental: {
-    optimizePackageImports: [],
+    optimizePackageImports: [
+      "antd",
+      "@ant-design/icons",
+      "@ant-design/x",
+      "lodash",
+    ],
   },
   async rewrites() {
     return [

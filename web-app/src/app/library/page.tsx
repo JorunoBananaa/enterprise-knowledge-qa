@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -273,6 +280,10 @@ function LibraryPageContent() {
 
   const categories = catData?.items ?? [];
   const catTree = useMemo(() => buildCatTree(categories), [categories]);
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
+  );
 
   // ── category CRUD modal ──
   const [catModalOpen, setCatModalOpen] = useState(false);
@@ -280,12 +291,12 @@ function LibraryPageContent() {
   const [creatingParentId, setCreatingParentId] = useState<number | null>(null);
   const [catForm] = Form.useForm();
 
-  const openCreateCat = (parentId?: number) => {
+  const openCreateCat = useCallback((parentId?: number) => {
     setEditingCatId(null);
     setCreatingParentId(parentId ?? null);
     catForm.resetFields();
     setCatModalOpen(true);
-  };
+  }, [catForm]);
 
   // ── upload modal ──
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -293,12 +304,12 @@ function LibraryPageContent() {
   const [uploadCategoryId, setUploadCategoryId] = useState<number | null>(null);
   const [uploadForm] = Form.useForm();
 
-  const openUploadModal = (categoryId: number) => {
+  const openUploadModal = useCallback((categoryId: number) => {
     setUploadFile(null);
     setUploadCategoryId(categoryId);
     uploadForm.resetFields();
     setUploadModalOpen(true);
-  };
+  }, [uploadForm]);
 
   const {
     loading: uploading,
@@ -346,11 +357,11 @@ function LibraryPageContent() {
     accept: ".pdf,.docx,.pptx,.xlsx",
   };
 
-  const openEditCat = (record: CategoryItem) => {
+  const openEditCat = useCallback((record: CategoryItem) => {
     setEditingCatId(record.id);
     catForm.setFieldsValue({ name: record.name });
     setCatModalOpen(true);
-  };
+  }, [catForm]);
 
   const onCatSuccess = () => {
     setCatModalOpen(false);
@@ -405,93 +416,108 @@ function LibraryPageContent() {
   });
 
   // ── tree node action menu ──
-  const getNodeMenuItems = (node: CatTreeNode) => [
-    {
-      key: "create-child",
-      icon: <PlusOutlined />,
-      label: "新建子分类",
-      onClick: () => openCreateCat(node.categoryId),
-    },
-    {
-      key: "upload",
-      icon: <UploadOutlined />,
-      label: "上传文档",
-      onClick: () => openUploadModal(node.categoryId),
-    },
-    {
-      key: "edit",
-      icon: <EditOutlined />,
-      label: "编辑分类",
-      onClick: () => {
-        const cat = categories.find((c) => c.id === node.categoryId);
-        if (cat) openEditCat(cat);
+  const getNodeMenuItems = useCallback(
+    (node: CatTreeNode) => [
+      {
+        key: "create-child",
+        icon: <PlusOutlined />,
+        label: "新建子分类",
+        onClick: () => openCreateCat(node.categoryId),
       },
-    },
-    { type: "divider" as const },
-    {
-      key: "delete",
-      icon: <DeleteOutlined />,
-      label: "删除分类",
-      danger: true,
-      onClick: () => {
-        const cat = categories.find((c) => c.id === node.categoryId);
-        const count = cat?.documents_count ?? 0;
+      {
+        key: "upload",
+        icon: <UploadOutlined />,
+        label: "上传文档",
+        onClick: () => openUploadModal(node.categoryId),
+      },
+      {
+        key: "edit",
+        icon: <EditOutlined />,
+        label: "编辑分类",
+        onClick: () => {
+          const cat = categoryById.get(node.categoryId);
+          if (cat) openEditCat(cat);
+        },
+      },
+      { type: "divider" as const },
+      {
+        key: "delete",
+        icon: <DeleteOutlined />,
+        label: "删除分类",
+        danger: true,
+        onClick: () => {
+          const cat = categoryById.get(node.categoryId);
+          const count = cat?.documents_count ?? 0;
 
-        modal.confirm({
-          title: "确定删除此分类？",
-          content:
-            count > 0
-              ? `该分类下共有 ${count} 篇文档，将同时删除所有子分类及其下的全部文档，此操作不可撤销。`
-              : "将同时删除所有子分类及其下的全部文档，此操作不可撤销。",
-          okText: "确认删除",
-          cancelText: "取消",
-          okButtonProps: { danger: true },
-          onOk: () => doDeleteCat(node.categoryId),
-        });
+          modal.confirm({
+            title: "确定删除此分类？",
+            content:
+              count > 0
+                ? `该分类下共有 ${count} 篇文档，将同时删除所有子分类及其下的全部文档，此操作不可撤销。`
+                : "将同时删除所有子分类及其下的全部文档，此操作不可撤销。",
+            okText: "确认删除",
+            cancelText: "取消",
+            okButtonProps: { danger: true },
+            onOk: () => doDeleteCat(node.categoryId),
+          });
+        },
       },
-    },
-  ];
+    ],
+    [
+      categoryById,
+      doDeleteCat,
+      modal,
+      openCreateCat,
+      openEditCat,
+      openUploadModal,
+    ],
+  );
 
   // ── tree node title render ──
-  const renderTreeTitle = (node: CatTreeNode) => (
-    <div className="flex items-center w-full pr-1 group/tree relative">
-      <span className="flex items-center gap-1.5 min-w-0 flex-1 pr-0 group-hover/tree:pr-5 transition-all">
-        <FolderOutlined className="text-amber-500 shrink-0" />
-        <span className="truncate text-[13px]">{node.title as string}</span>
-      </span>
-      {isAdmin && (
-        <Dropdown
-          menu={{ items: getNodeMenuItems(node) }}
-          trigger={["click"]}
-          placement="bottomRight"
-        >
-          <Button
-            type="text"
-            size="small"
-            className="opacity-0 group-hover/tree:opacity-100 transition-opacity duration-200 absolute right-1 top-1/2 -translate-y-1/2"
-            icon={<MoreOutlined className="text-[13px]" />}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </Dropdown>
-      )}
-    </div>
+  const renderTreeTitle = useCallback(
+    (node: CatTreeNode) => (
+      <div className="flex items-center w-full pr-1 group/tree relative">
+        <span className="flex items-center gap-1.5 min-w-0 flex-1 pr-0 group-hover/tree:pr-5 transition-all">
+          <FolderOutlined className="text-amber-500 shrink-0" />
+          <span className="truncate text-[13px]">{node.title as string}</span>
+        </span>
+        {isAdmin ? (
+          <Dropdown
+            menu={{ items: getNodeMenuItems(node) }}
+            trigger={["click"]}
+            placement="bottomRight"
+          >
+            <Button
+              type="text"
+              size="small"
+              className="opacity-0 group-hover/tree:opacity-100 transition-opacity duration-200 absolute right-1 top-1/2 -translate-y-1/2"
+              icon={<MoreOutlined className="text-[13px]" />}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Dropdown>
+        ) : null}
+      </div>
+    ),
+    [getNodeMenuItems, isAdmin],
   );
 
   // Attach title render to tree nodes (recursive)
-  const attachTitle = (nodes: CatTreeNode[]): CatTreeNode[] =>
-    nodes.map((node) => ({
-      ...node,
-      title: renderTreeTitle(node),
-      children: node.children
-        ? attachTitle(node.children as CatTreeNode[])
-        : undefined,
-    }));
-
-  const renderedTree = useMemo(
-    () => attachTitle(catTree),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [catTree, categories, isAdmin],
+  const attachTitle = useCallback(
+    (nodes: CatTreeNode[]): CatTreeNode[] =>
+      nodes.map((node) => ({
+        ...node,
+        title: renderTreeTitle(node),
+        children: node.children
+          ? attachTitle(node.children as CatTreeNode[])
+          : undefined,
+      })),
+    [renderTreeTitle],
   );
+
+  const renderedTree = useMemo(() => attachTitle(catTree), [
+    attachTitle,
+    catTree,
+  ]);
 
   // 默认选中第一个根分类
   useEffect(() => {
@@ -646,9 +672,7 @@ function LibraryPageContent() {
             <Form.Item label="分类">
               <Input
                 disabled
-                value={
-                  categories.find((c) => c.id === uploadCategoryId)?.name ?? ""
-                }
+                value={categoryById.get(uploadCategoryId ?? -1)?.name ?? ""}
                 className="!text-zinc-700"
               />
             </Form.Item>
