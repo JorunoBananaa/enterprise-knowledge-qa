@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Select,
   Skeleton,
@@ -41,6 +41,7 @@ import type {
 import { EMPTY_DOCUMENTS } from "./_lib/constants";
 import { buildCatTree } from "./_lib/category-tree";
 import {
+  canForkChatMessage,
   getChatMessageRenderKey,
   normalizeMessageAnswer,
 } from "./_lib/message-utils";
@@ -52,6 +53,10 @@ import {
 } from "./_lib/qa-chat-provider";
 
 const { Text } = Typography;
+
+interface ForkSessionResponse {
+  session_id: number;
+}
 
 function createRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -81,10 +86,12 @@ export default function QAPage() {
 
 function QAPageContent() {
   const { token } = theme.useToken();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionIdParam = searchParams.get("session_id");
 
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [forkingMessageId, setForkingMessageId] = useState<number | null>(null);
   const [question, setQuestion] = useState("");
   const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(
     undefined,
@@ -175,6 +182,16 @@ function QAPageContent() {
   // ── load session list ──
   const { data: sessions = [], run: loadSessions } =
     useApi<SessionItem[]>("/qa/sessions");
+
+  // ── fork session ──
+  const { runAsync: forkSession } = useApi<
+    ForkSessionResponse,
+    [number],
+    "POST"
+  >((messageId: number) => `/qa/messages/${messageId}/fork`, {
+    method: "POST",
+    manual: true,
+  });
 
   // ── load LLM configs ──
   const { data: llmConfigs = [] } = useApi<LLMConfigBrief[]>(
@@ -362,10 +379,22 @@ function QAPageContent() {
     console.log("edit question", msg);
   }, []);
   const handleForkAnswer = useCallback(
-    (msg: ChatMessageOut) => {
-      console.log("fork answer", msg);
+    async (msg: ChatMessageOut) => {
+      if (!canForkChatMessage(msg) || forkingMessageId !== null) return;
+
+      setForkingMessageId(msg.id);
+      try {
+        const result = await forkSession(msg.id);
+        router.replace(`/qa?session_id=${result.session_id}`);
+        await Promise.resolve(loadSessions());
+        window.dispatchEvent(new Event("qa:sessions-updated"));
+      } catch {
+        message.error("创建分支失败");
+      } finally {
+        setForkingMessageId(null);
+      }
     },
-    [handleAsk],
+    [forkSession, forkingMessageId, loadSessions, router],
   );
   const handleSelectSource = useCallback((source: SourceSummary) => {
     setSourceDetail(source);
@@ -492,6 +521,7 @@ function QAPageContent() {
                       answerBorderRadius={answerBorderRadius}
                       onEditQuestion={handleEditQuestion}
                       onForkAnswer={handleForkAnswer}
+                      forking={forkingMessageId === msg.id}
                       onSelectSource={handleSelectSource}
                       lastIndex={index === normalizedChatMessageInfos.length - 1}
                     />

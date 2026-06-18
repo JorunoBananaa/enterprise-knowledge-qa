@@ -8,7 +8,10 @@ import {
 } from "@ant-design/icons";
 import { Actions, Bubble } from "@ant-design/x";
 import type { ChatMessageOut, SourceSummary } from "../_types";
-import { shouldRenderAssistantAnswer } from "../_lib/message-utils";
+import {
+  canForkChatMessage,
+  shouldRenderAssistantAnswer,
+} from "../_lib/message-utils";
 import MarkdownAnswer from "./MarkdownAnswer";
 import SourceChips from "./SourceChips";
 
@@ -25,6 +28,7 @@ interface ChatMessageItemProps {
   questionBorderRadius: string;
   answerBorderRadius: string;
   lastIndex?: boolean;
+  forking?: boolean;
   onEditQuestion: (message: ChatMessageOut) => void;
   onForkAnswer: (message: ChatMessageOut) => void;
   onSelectSource: (source: SourceSummary) => void;
@@ -37,12 +41,14 @@ const ChatMessageItem = memo(function ChatMessageItem({
   questionBorderRadius,
   answerBorderRadius,
   lastIndex,
+  forking,
   onEditQuestion,
   onForkAnswer,
   onSelectSource,
 }: ChatMessageItemProps) {
   const hasAnswer = msg.answer.trim().length > 0;
   const renderAssistantAnswer = shouldRenderAssistantAnswer(msg);
+  const canFork = canForkChatMessage(msg);
   const actionStyles = {
     item: { color: tertiaryTextColor },
   };
@@ -147,12 +153,18 @@ const ChatMessageItem = memo(function ChatMessageItem({
                         />
                       ),
                     },
-                    {
-                      key: "fork",
-                      icon: <BranchesOutlined />,
-                      label: "分叉",
-                      onItemClick: () => onForkAnswer(msg),
-                    },
+                    ...(canFork
+                      ? [
+                          {
+                            key: "fork",
+                            icon: <BranchesOutlined />,
+                            label: "分叉",
+                            onItemClick: () => {
+                              if (!forking) onForkAnswer(msg);
+                            },
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               </div>
