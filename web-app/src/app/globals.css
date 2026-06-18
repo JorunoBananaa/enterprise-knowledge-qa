@@ -192,6 +192,168 @@ textarea.ant-input:not(.ant-input-disabled),
   color: inherit !important;
 }
 
+/* ── Ant Design Select refinements ───────────────────────────── */
+.ant-select.ant-select-outlined {
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.ant-select-single.ant-select-outlined {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ant-select-single.ant-select-sm {
+  height: 30px !important;
+}
+
+.ant-select-single:not(.ant-select-sm):not(.ant-select-lg) {
+  height: 36px !important;
+}
+
+.ant-select-single.ant-select-lg {
+  height: 40px !important;
+}
+
+.ant-select.ant-select-outlined .ant-select-selector {
+  border-color: #d1d5db !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.ant-select:not(.ant-select-disabled):hover,
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+  border-color: #9ca3af !important;
+}
+
+.ant-select.ant-select-focused:not(.ant-select-disabled),
+.ant-select.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+  border-color: #171717 !important;
+  box-shadow: 0 0 0 2px rgb(23 23 23 / 0.08) !important;
+}
+
+.ant-select.ant-select-disabled {
+  border-color: #e5e7eb !important;
+  background: #f8fafc !important;
+  color: #94a3b8 !important;
+}
+
+.ant-select-single.ant-select-sm .ant-select-content {
+  height: 28px !important;
+  padding: 0 30px 0 10px !important;
+  line-height: 28px !important;
+}
+
+.ant-select-single:not(.ant-select-sm):not(.ant-select-lg)
+  .ant-select-content {
+  height: 34px !important;
+  padding: 0 34px 0 12px !important;
+  line-height: 34px !important;
+}
+
+.ant-select-single.ant-select-lg .ant-select-content {
+  height: 38px !important;
+  padding: 0 38px 0 14px !important;
+  line-height: 38px !important;
+}
+
+.ant-select-single .ant-select-content {
+  overflow: hidden;
+  color: #64748b !important;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-select-single.ant-select-sm .ant-select-content,
+.ant-select-single.ant-select-sm .ant-select-selection-item,
+.ant-select-single.ant-select-sm .ant-select-selection-placeholder {
+  font-size: 13px;
+}
+
+.ant-select-single .ant-select-selection-item,
+.ant-select-single .ant-select-selection-placeholder {
+  display: block;
+  overflow: hidden;
+  color: #64748b !important;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-select-single.ant-select-sm .ant-select-selection-item,
+.ant-select-single.ant-select-sm .ant-select-selection-placeholder {
+  line-height: 28px !important;
+}
+
+.ant-select-single:not(.ant-select-sm):not(.ant-select-lg)
+  .ant-select-selection-item,
+.ant-select-single:not(.ant-select-sm):not(.ant-select-lg)
+  .ant-select-selection-placeholder {
+  line-height: 34px !important;
+}
+
+.ant-select-single.ant-select-lg .ant-select-selection-item,
+.ant-select-single.ant-select-lg .ant-select-selection-placeholder {
+  line-height: 38px !important;
+}
+
+.ant-select-single .ant-select-selection-placeholder {
+  color: #94a3b8 !important;
+}
+
+.ant-select-single .ant-select-input {
+  color: inherit;
+}
+
+.ant-select .ant-select-suffix,
+.ant-select .ant-select-arrow {
+  color: #94a3b8;
+}
+
+.ant-select-dropdown {
+  padding: 6px !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 12px 28px rgb(15 23 42 / 0.12),
+    0 4px 10px rgb(15 23 42 / 0.08) !important;
+}
+
+.ant-select-dropdown .ant-select-item {
+  min-height: 34px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #1f2937;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.ant-select-dropdown
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: #f4f4f5 !important;
+  color: #111827 !important;
+}
+
+.ant-select-dropdown
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: #171717 !important;
+  color: #fff !important;
+}
+
+.ant-select-dropdown
+  .ant-select-item-option-selected
+  .ant-select-item-option-content,
+.ant-select-dropdown
+  .ant-select-item-option-selected
+  .ant-select-item-option-state {
+  color: inherit !important;
+}
+
 /* ── QA Markdown answer ───────────────────────────────────────── */
 .qa-answer-markdown {
   color: #1f2937;
