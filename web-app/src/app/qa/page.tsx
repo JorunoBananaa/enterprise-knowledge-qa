@@ -40,7 +40,10 @@ import type {
 } from "./_types";
 import { EMPTY_DOCUMENTS } from "./_lib/constants";
 import { buildCatTree } from "./_lib/category-tree";
-import { normalizeMessageAnswer } from "./_lib/message-utils";
+import {
+  getChatMessageRenderKey,
+  normalizeMessageAnswer,
+} from "./_lib/message-utils";
 import { replaceCurrentSessionUrl } from "./_lib/session-url";
 import {
   createPendingQAChatMessage,
@@ -107,7 +110,10 @@ function QAPageContent() {
   const [provider] = useState(createQAChatProvider);
   const requestPlaceholder = useCallback(
     (requestParams: Partial<QAAskInput>) =>
-      createPendingQAChatMessage(requestParams.question?.trim() || ""),
+      createPendingQAChatMessage(
+        requestParams.question?.trim() || "",
+        requestParams.request_id,
+      ),
     [],
   );
   const requestFallback = useCallback(
@@ -123,7 +129,10 @@ function QAPageContent() {
     ) => {
       const base =
         messageInfo?.message ||
-        createPendingQAChatMessage(requestParams.question?.trim() || "");
+        createPendingQAChatMessage(
+          requestParams.question?.trim() || "",
+          requestParams.request_id,
+        );
 
       if (error.name !== "AbortError") {
         message.error(error.message || "获取答案失败");
@@ -150,9 +159,17 @@ function QAPageContent() {
     requestPlaceholder,
     requestFallback,
   });
-  const messages = useMemo(
-    () => chatMessageInfos.map((info) => normalizeMessageAnswer(info.message)),
+  const normalizedChatMessageInfos = useMemo(
+    () =>
+      chatMessageInfos.map((info) => ({
+        ...info,
+        message: normalizeMessageAnswer(info.message),
+      })),
     [chatMessageInfos],
+  );
+  const messages = useMemo(
+    () => normalizedChatMessageInfos.map((info) => info.message),
+    [normalizedChatMessageInfos],
   );
 
   // ── load session list ──
@@ -462,20 +479,24 @@ function QAPageContent() {
           ) : (
             <div className="w-full max-w-[784px] mx-auto px-10 sm:px-12 cursor-default">
               <Space direction="vertical" size={28} style={{ width: "100%" }}>
-                {messages.map((msg, index) => (
-                  <ChatMessageItem
-                    key={msg.id}
-                    message={msg}
-                    primaryColor={token.colorPrimary}
-                    tertiaryTextColor={token.colorTextTertiary}
-                    questionBorderRadius={questionBorderRadius}
-                    answerBorderRadius={answerBorderRadius}
-                    onEditQuestion={handleEditQuestion}
-                    onForkAnswer={handleForkAnswer}
-                    onSelectSource={handleSelectSource}
-                    lastIndex={index === messages.length - 1}
-                  />
-                ))}
+                {normalizedChatMessageInfos.map((info, index) => {
+                  const msg = info.message;
+
+                  return (
+                    <ChatMessageItem
+                      key={getChatMessageRenderKey(info)}
+                      message={msg}
+                      primaryColor={token.colorPrimary}
+                      tertiaryTextColor={token.colorTextTertiary}
+                      questionBorderRadius={questionBorderRadius}
+                      answerBorderRadius={answerBorderRadius}
+                      onEditQuestion={handleEditQuestion}
+                      onForkAnswer={handleForkAnswer}
+                      onSelectSource={handleSelectSource}
+                      lastIndex={index === normalizedChatMessageInfos.length - 1}
+                    />
+                  );
+                })}
                 <div ref={bottomRef} />
               </Space>
             </div>

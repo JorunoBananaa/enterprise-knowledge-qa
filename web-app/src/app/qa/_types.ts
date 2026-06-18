@@ -10,6 +10,7 @@ export interface LLMConfigBrief {
 
 export interface ChatMessageOut {
   id: number;
+  client_id?: string;
   session_id?: number;
   question: string;
   answer: string;

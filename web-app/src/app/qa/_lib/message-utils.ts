@@ -17,6 +17,16 @@ export function normalizeMessageAnswer(
   return message;
 }
 
+export function getChatMessageRenderKey({
+  id,
+  message,
+}: {
+  id: string | number;
+  message: ChatMessageOut;
+}): string | number {
+  return message.client_id || id;
+}
+
 export function shouldRenderAssistantAnswer(message: ChatMessageOut): boolean {
   return (
     message.answer.trim().length > 0 || message.result_status !== "aborted"

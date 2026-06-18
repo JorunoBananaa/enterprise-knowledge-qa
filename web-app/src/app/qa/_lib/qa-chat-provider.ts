@@ -48,9 +48,13 @@ function toCitationItem(event: Extract<StreamEvent, { type: "citation" }>) {
   return citation as CitationItem;
 }
 
-export function createPendingQAChatMessage(question: string): ChatMessageOut {
+export function createPendingQAChatMessage(
+  question: string,
+  clientId?: string | null,
+): ChatMessageOut {
   return {
     id: -Date.now(),
+    ...(clientId ? { client_id: clientId } : {}),
     question,
     answer: "",
     result_status: "streaming",
@@ -65,6 +69,7 @@ export class QAChatProvider extends AbstractChatProvider<
   QAChatOutput
 > {
   private currentQuestion = "";
+  private currentClientId: string | null = null;
 
   transformParams(
     requestParams: Partial<QAAskInput>,
@@ -77,6 +82,7 @@ export class QAChatProvider extends AbstractChatProvider<
     const question = params.question?.trim() || "";
 
     this.currentQuestion = question;
+    this.currentClientId = params.request_id ?? null;
 
     return {
       question,
@@ -96,7 +102,8 @@ export class QAChatProvider extends AbstractChatProvider<
     info: TransformMessage<ChatMessageOut, QAChatOutput>,
   ): ChatMessageOut {
     const current =
-      info.originMessage || createPendingQAChatMessage(this.currentQuestion);
+      info.originMessage ||
+      createPendingQAChatMessage(this.currentQuestion, this.currentClientId);
     const event = parseStreamEvent(info.chunk);
 
     if (!event) {
