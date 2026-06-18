@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from app.models.chat import ChatMessage, Citation
-from app.services.chat_persistence import persist_streamed_chat_message
+from app.models.chat import ChatMessage, ChatSession, Citation
+from app.services.chat_persistence import (
+    persist_new_chat_session,
+    persist_streamed_chat_message,
+)
 
 
 class FakeDbSession:
@@ -26,6 +29,21 @@ class FakeDbSession:
 
 
 class PersistStreamedChatMessageTest(unittest.TestCase):
+    def test_commits_new_session_before_answer_stream_finishes(self) -> None:
+        db = FakeDbSession()
+
+        session = persist_new_chat_session(
+            db,
+            user_id="user-1",
+            title="第一问",
+        )
+
+        self.assertIsInstance(session, ChatSession)
+        self.assertEqual(session.user_id, "user-1")
+        self.assertEqual(session.title, "第一问")
+        self.assertEqual(db.flush_count, 1)
+        self.assertEqual(db.commit_count, 1)
+
     def test_preserves_partial_answer_when_aborted(self) -> None:
         db = FakeDbSession()
 

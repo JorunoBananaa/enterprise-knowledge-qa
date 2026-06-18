@@ -3,7 +3,23 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from app.models.chat import ChatMessage, Citation
+from app.models.chat import ChatMessage, ChatSession, Citation
+
+
+def persist_new_chat_session(
+    db: Any,
+    *,
+    user_id: str,
+    title: str | None,
+) -> ChatSession:
+    session = ChatSession(
+        user_id=user_id,
+        title=title,
+    )
+    db.add(session)
+    db.flush()
+    db.commit()
+    return session
 
 
 def persist_streamed_chat_message(

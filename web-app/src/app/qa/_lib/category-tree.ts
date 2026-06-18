@@ -35,9 +35,3 @@ export function buildCatTree(items: CategoryItem[]): CatTreeNode[] {
   clean(roots);
   return roots;
 }
-
-export function replaceCurrentSessionUrl(sessionId: number) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("session_id", String(sessionId));
-  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-}

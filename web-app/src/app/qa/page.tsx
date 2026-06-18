@@ -39,8 +39,9 @@ import type {
   SourceSummary,
 } from "./_types";
 import { EMPTY_DOCUMENTS } from "./_lib/constants";
-import { buildCatTree, replaceCurrentSessionUrl } from "./_lib/category-tree";
+import { buildCatTree } from "./_lib/category-tree";
 import { normalizeMessageAnswer } from "./_lib/message-utils";
+import { replaceCurrentSessionUrl } from "./_lib/session-url";
 import {
   createPendingQAChatMessage,
   createQAChatProvider,

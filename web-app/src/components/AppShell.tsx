@@ -15,7 +15,6 @@ import {
   Button,
   Layout,
   Popconfirm,
-  Skeleton,
   Spin,
   Typography,
   message,
@@ -35,6 +34,7 @@ import {
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
+import { pushCurrentSessionUrl } from "@/app/qa/_lib/session-url";
 import type { CurrentUser } from "@/lib/auth-client";
 
 const { Content } = Layout;
@@ -273,31 +273,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between px-[7px] pb-2.5 text-[#7b8492] text-xs font-semibold">
               <span>历史会话</span>
             </div>
-            <Suspense
-              fallback={
-                <div
-                  className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
-                  style={{ padding: "0 8px" }}
-                >
-                  {[1, 2, 3, 4].map((i) => (
-                    <Skeleton
-                      key={i}
-                      active
-                      paragraph={{ rows: 1, width: "70%" }}
-                      title={false}
-                      style={{ padding: "0 4px", marginBottom: 4 }}
-                    />
-                  ))}
-                </div>
-              }
-            >
-              <SessionHistoryBlock
-                sessions={qaSessions}
-                loading={sessionsLoading}
-                onDeleteSession={handleDeleteSession}
-                onCurrentSessionIdChange={handleCurrentSessionIdChange}
-              />
-            </Suspense>
+            <SessionHistoryBlock
+              sessions={qaSessions}
+              loading={sessionsLoading}
+              onDeleteSession={handleDeleteSession}
+              onCurrentSessionIdChange={handleCurrentSessionIdChange}
+            />
           </div>
         </div>
 
@@ -352,37 +333,29 @@ interface SessionHistoryBlockProps {
 
 function SessionHistoryBlock({
   sessions,
-  loading,
   onDeleteSession,
   onCurrentSessionIdChange,
 }: SessionHistoryBlockProps) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
   const currentSessionId = searchParams.get("session_id");
+  const handleOpenSession = useCallback(
+    (sessionId: number) => {
+      if (pathname === "/qa") {
+        pushCurrentSessionUrl(sessionId);
+        return;
+      }
+
+      router.push(`/qa?session_id=${sessionId}`);
+    },
+    [pathname, router],
+  );
 
   // Keep the parent in sync so the delete callback can check the current id
   useEffect(() => {
     onCurrentSessionIdChange(currentSessionId);
   }, [currentSessionId, onCurrentSessionIdChange]);
-
-  if (loading) {
-    return (
-      <div
-        className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
-        style={{ padding: "0 8px" }}
-      >
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton
-            key={i}
-            active
-            paragraph={{ rows: 1, width: "70%" }}
-            title={false}
-            style={{ padding: "0 4px", marginBottom: 4 }}
-          />
-        ))}
-      </div>
-    );
-  }
 
   if (sessions.length === 0) {
     return (
@@ -402,7 +375,7 @@ function SessionHistoryBlock({
             }`}
           >
             <div
-              onClick={() => router.push(`/qa?session_id=${session.id}`)}
+              onClick={() => handleOpenSession(session.id)}
               className="flex-1 min-w-0 text-inherit cursor-pointer"
             >
               <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold">

@@ -28,7 +28,10 @@ from app.schemas.chat import (
     ChatSessionOut,
 )
 from app.services.embedding_factory import create_embeddings
-from app.services.chat_persistence import persist_streamed_chat_message
+from app.services.chat_persistence import (
+    persist_new_chat_session,
+    persist_streamed_chat_message,
+)
 from app.services.llm_factory import create_chat_model
 from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
 
@@ -117,13 +120,11 @@ def _resolve_session(
             raise HTTPException(status_code=404, detail="会话不存在")
         return session
 
-    session = ChatSession(
+    return persist_new_chat_session(
+        db,
         user_id=user_id,
         title=_first_line(question),
     )
-    db.add(session)
-    db.flush()
-    return session
 
 
 def _resolve_llm(llm_config_id: int | None) -> Any:
