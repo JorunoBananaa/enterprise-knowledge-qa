@@ -85,6 +85,7 @@ export async function apiFetch<T = unknown>(
 // ── SSE streaming ──────────────────────────────────────────────────────
 
 export type StreamEvent =
+  | { type: "session"; session_id: number }
   | { type: "chunk"; text: string }
   | {
       type: "citation";

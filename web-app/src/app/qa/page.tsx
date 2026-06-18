@@ -49,6 +49,14 @@ import {
 
 const { Text } = Typography;
 
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ── component ────────────────────────────────────────────────────────
 
 export default function QAPage() {
@@ -80,6 +88,7 @@ function QAPageContent() {
   const [sourceDetail, setSourceDetail] = useState<SourceSummary | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const localSessionUrlSyncRef = useRef<number | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
 
   // ── scope selection ──
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -123,9 +132,7 @@ function QAPageContent() {
         ...base,
         answer:
           base.answer ||
-          (error.name === "AbortError"
-            ? "已停止生成"
-            : error.message || "获取答案失败"),
+          (error.name === "AbortError" ? "" : error.message || "获取答案失败"),
         result_status: error.name === "AbortError" ? "aborted" : "error",
       };
     },
@@ -274,6 +281,8 @@ function QAPageContent() {
         return;
       }
       setQuestion("");
+      const requestId = createRequestId();
+      activeRequestIdRef.current = requestId;
 
       onRequest({
         question: q,
@@ -281,6 +290,7 @@ function QAPageContent() {
         llm_config_id: selectedLlmId ?? null,
         category_ids: scopeCategoryIds.length > 0 ? scopeCategoryIds : null,
         document_ids: scopeDocumentIds.length > 0 ? scopeDocumentIds : null,
+        request_id: requestId,
       });
     },
     [
@@ -292,6 +302,27 @@ function QAPageContent() {
       selectedLlmId,
     ],
   );
+
+  const handleCancel = useCallback(() => {
+    const requestId = activeRequestIdRef.current;
+    if (requestId) {
+      void apiFetch("/qa/ask/cancel", {
+        method: "POST",
+        body: JSON.stringify({ request_id: requestId }),
+      }).catch(() => {
+        /* best-effort cancellation */
+      });
+    }
+
+    abort();
+    activeRequestIdRef.current = null;
+  }, [abort]);
+
+  useEffect(() => {
+    if (!isRequesting) {
+      activeRequestIdRef.current = null;
+    }
+  }, [isRequesting]);
 
   // ── auto-scroll to bottom (throttled) ──────────────────────────
 
@@ -473,7 +504,7 @@ function QAPageContent() {
               onChange={setQuestion}
               onSubmit={handleAsk}
               loading={isRequesting}
-              onCancel={abort}
+              onCancel={handleCancel}
               placeholder="向知识库提问，例如：报销标准是多少？"
               autoSize={{ minRows: 1, maxRows: 5 }}
               className="qa-compose"

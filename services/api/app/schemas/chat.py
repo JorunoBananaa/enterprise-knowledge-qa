@@ -13,6 +13,11 @@ class AskRequest(BaseModel):
     llm_config_id: int | None = None  # None → use active config
     category_ids: list[int] | None = None  # None / [] → search all categories
     document_ids: list[int] | None = None  # None / [] → search all documents
+    request_id: str | None = None
+
+
+class AskCancelRequest(BaseModel):
+    request_id: str
 
 
 # ── Session list / detail ─────────────────────────────────────────────

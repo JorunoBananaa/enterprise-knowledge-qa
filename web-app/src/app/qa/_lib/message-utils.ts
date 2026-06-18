@@ -17,6 +17,12 @@ export function normalizeMessageAnswer(
   return message;
 }
 
+export function shouldRenderAssistantAnswer(message: ChatMessageOut): boolean {
+  return (
+    message.answer.trim().length > 0 || message.result_status !== "aborted"
+  );
+}
+
 function getCitationDocumentName(citation: CitationItem): string {
   return (
     citation.document_name?.trim() ||

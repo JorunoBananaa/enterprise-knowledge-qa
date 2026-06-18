@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+from dataclasses import dataclass
 import json
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,7 @@ from app.repositories.llm_config import get_active_llm_config, get_llm_config
 from app.repositories.prompts import get_system_prompt_content, get_user_prompt
 from app.schemas.auth import CurrentUser
 from app.schemas.chat import (
+    AskCancelRequest,
     AskRequest,
     CitationOut,
     ChatMessageOut,
@@ -25,12 +28,27 @@ from app.schemas.chat import (
     ChatSessionOut,
 )
 from app.services.embedding_factory import create_embeddings
+from app.services.chat_persistence import persist_streamed_chat_message
 from app.services.llm_factory import create_chat_model
 from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
 
 router = APIRouter()
 
 CHAT_HISTORY_LIMIT = 6
+SSE_HEADERS = {
+    "X-Accel-Buffering": "no",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+}
+
+
+@dataclass
+class AskCancelState:
+    event: asyncio.Event
+    task: asyncio.Task[Any] | None = None
+
+
+_ASK_CANCEL_STATES: dict[str, AskCancelState] = {}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -47,6 +65,36 @@ def format_sse(event_type: str, data: dict | str | None = None) -> str:
         data = {}
     payload = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data
     return f"event: {event_type}\ndata: {payload}\n\n"
+
+
+def _register_ask_cancel_state(request_id: str | None) -> AskCancelState | None:
+    if not request_id:
+        return None
+
+    state = _ASK_CANCEL_STATES.get(request_id)
+    if state is None:
+        state = AskCancelState(event=asyncio.Event())
+        _ASK_CANCEL_STATES[request_id] = state
+
+    state.task = asyncio.current_task()
+    return state
+
+
+def _refresh_ask_cancel_task(state: AskCancelState | None) -> None:
+    if state is not None:
+        state.task = asyncio.current_task()
+
+
+def _unregister_ask_cancel_state(
+    request_id: str | None,
+    state: AskCancelState | None,
+) -> None:
+    if request_id and _ASK_CANCEL_STATES.get(request_id) is state:
+        _ASK_CANCEL_STATES.pop(request_id, None)
+
+
+def _is_ask_cancelled(state: AskCancelState | None) -> bool:
+    return bool(state and state.event.is_set())
 
 
 def _resolve_session(
@@ -435,55 +483,159 @@ def delete_session(
 
 # ── Ask (streaming) ───────────────────────────────────────────────────
 
+
+@router.post("/ask/cancel")
+async def cancel_question_stream(
+    payload: AskCancelRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> dict[str, bool]:
+    """Cancel an in-flight streaming answer for the current process."""
+    del current_user
+
+    state = _ASK_CANCEL_STATES.get(payload.request_id)
+    if state is None:
+        return {"cancelled": False}
+
+    state.event.set()
+    if state.task is not None:
+        state.task.cancel()
+
+    return {"cancelled": True}
+
+
 @router.post("/ask/stream")
 async def ask_question_stream(
     payload: AskRequest,
+    request: Request,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
     """Ask a question with SSE streaming response.
 
     Events:
+        session → {"session_id": …}
         chunk   → {"text": "…"}
         citation → {"document_id": …, "document_name": …, "document_path": …, "chunk_id": …, "locator": …}
         done    → {"status": "answered", "session_id": …, "message_id": …}
         error   → {"message": "…"}
     """
     user_id = str(current_user.id)
+    cancel_state = _register_ask_cancel_state(payload.request_id)
+    session: ChatSession | None = None
+    pre_stream_abort_persisted = False
 
-    session = _resolve_session(user_id, payload.session_id, payload.question, db)
+    async def _should_stop() -> bool:
+        if _is_ask_cancelled(cancel_state):
+            return True
+        return await request.is_disconnected()
 
-    # Build LLM synchronously
+    def _persist_pre_stream_abort() -> None:
+        nonlocal pre_stream_abort_persisted
+        if session is None or pre_stream_abort_persisted:
+            return
+
+        persist_streamed_chat_message(
+            db,
+            session_id=session.id,
+            question=payload.question,
+            answer_parts=[],
+            result_status="aborted",
+            citations=[],
+        )
+        pre_stream_abort_persisted = True
+
+    def _empty_stream_response() -> StreamingResponse:
+        return StreamingResponse(
+            iter(()),
+            media_type="text/event-stream",
+            headers=SSE_HEADERS,
+        )
+
     try:
-        llm = _resolve_llm(payload.llm_config_id)
-    except HTTPException:
+        session = _resolve_session(user_id, payload.session_id, payload.question, db)
+
+        if await _should_stop():
+            _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            return _empty_stream_response()
+
+        # Build LLM synchronously
+        try:
+            llm = _resolve_llm(payload.llm_config_id)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
+
+        if await _should_stop():
+            _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            return _empty_stream_response()
+
+        # Resolve scope filtering (categories → document IDs)
+        target_document_ids = _resolve_target_document_ids(
+            db, payload.category_ids, payload.document_ids,
+        )
+
+        system_prompt, user_prompt = _resolve_prompts(current_user.id)
+        chat_history = _load_chat_history(session.id, db)
+        retrieval_question = await rewrite_question_for_retrieval(
+            question=payload.question,
+            chat_history=chat_history,
+            llm=llm,
+        )
+
+        if await _should_stop():
+            _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            return _empty_stream_response()
+
+        # Retrieve relevant chunks via pgvector ANN search (scoped)
+        retrieved_chunks = _retrieve_chunks(
+            retrieval_question, db, target_document_ids=target_document_ids,
+        )
+
+        if await _should_stop():
+            _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            return _empty_stream_response()
+    except asyncio.CancelledError:
+        _persist_pre_stream_abort()
+        _unregister_ask_cancel_state(payload.request_id, cancel_state)
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
-
-    # Resolve scope filtering (categories → document IDs)
-    target_document_ids = _resolve_target_document_ids(
-        db, payload.category_ids, payload.document_ids,
-    )
-
-    system_prompt, user_prompt = _resolve_prompts(current_user.id)
-    chat_history = _load_chat_history(session.id, db)
-    retrieval_question = await rewrite_question_for_retrieval(
-        question=payload.question,
-        chat_history=chat_history,
-        llm=llm,
-    )
-
-    # Retrieve relevant chunks via pgvector ANN search (scoped)
-    retrieved_chunks = _retrieve_chunks(
-        retrieval_question, db, target_document_ids=target_document_ids,
-    )
+    except Exception:
+        _unregister_ask_cancel_state(payload.request_id, cancel_state)
+        raise
 
     async def _stream_events():
         chunks_received: list[str] = []
         citation_list: list[dict] = []
+        persisted_msg: ChatMessage | None = None
+
+        def persist_message(result_status: str) -> ChatMessage:
+            nonlocal persisted_msg
+            if persisted_msg is not None:
+                return persisted_msg
+
+            persisted_msg = persist_streamed_chat_message(
+                db,
+                session_id=session.id,
+                question=payload.question,
+                answer_parts=chunks_received,
+                result_status=result_status,
+                citations=citation_list,
+            )
+            return persisted_msg
 
         try:
+            _refresh_ask_cancel_task(cancel_state)
+
+            if await _should_stop():
+                persist_message("aborted")
+                return
+
+            yield format_sse("session", {"session_id": session.id})
+
             async for event in answer_question_stream(
                 question=payload.question,
                 retrieved_chunks=retrieved_chunks,
@@ -492,6 +644,10 @@ async def ask_question_stream(
                 llm=llm,
                 chat_history=chat_history,
             ):
+                if await _should_stop():
+                    persist_message("aborted")
+                    return
+
                 if event["type"] == "chunk":
                     chunks_received.append(event["text"])
                     yield format_sse("chunk", {"text": event["text"]})
@@ -501,30 +657,7 @@ async def ask_question_stream(
                     yield format_sse("citation", event)
 
                 elif event["type"] == "done":
-                    # Persist message + citations on "done"
-                    full_answer = "".join(chunks_received)
-                    msg = ChatMessage(
-                        session_id=session.id,
-                        question=payload.question,
-                        answer=full_answer,
-                        result_status=event.get("status", "answered"),
-                    )
-                    db.add(msg)
-                    db.flush()
-
-                    for c in citation_list:
-                        db.add(
-                            Citation(
-                                chat_message_id=msg.id,
-                                document_id=c.get("document_id", 0),
-                                chunk_id=c.get("chunk_id", 0),
-                                locator=c.get("locator", ""),
-                                quoted_text_preview=c.get("quoted_text_preview", ""),
-                                rank=c.get("rank", 0),
-                            )
-                        )
-
-                    db.commit()
+                    msg = persist_message(event.get("status", "answered"))
 
                     yield format_sse("done", {
                         "status": event.get("status", "answered"),
@@ -537,16 +670,17 @@ async def ask_question_stream(
                     yield format_sse("error", {"message": event["message"]})
                     return
 
+        except asyncio.CancelledError:
+            persist_message("aborted")
+            raise
         except Exception as exc:
             logging.getLogger(__name__).exception("Stream error")
             yield format_sse("error", {"message": f"流式生成失败: {exc}"})
+        finally:
+            _unregister_ask_cancel_state(payload.request_id, cancel_state)
 
     return StreamingResponse(
         _stream_events(),
         media_type="text/event-stream",
-        headers={
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache, no-transform",
-            "Connection": "keep-alive",
-        },
+        headers=SSE_HEADERS,
     )

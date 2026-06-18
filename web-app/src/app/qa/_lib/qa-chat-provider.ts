@@ -21,6 +21,7 @@ export interface QAAskInput {
   llm_config_id: number | null;
   category_ids: number[] | null;
   document_ids: number[] | null;
+  request_id: string | null;
 }
 
 type QAChatOutput = SSEOutput;
@@ -83,6 +84,7 @@ export class QAChatProvider extends AbstractChatProvider<
       llm_config_id: params.llm_config_id ?? null,
       category_ids: normalizeOptionalIds(params.category_ids),
       document_ids: normalizeOptionalIds(params.document_ids),
+      request_id: params.request_id ?? null,
     };
   }
 
@@ -102,6 +104,12 @@ export class QAChatProvider extends AbstractChatProvider<
     }
 
     switch (event.type) {
+      case "session":
+        return {
+          ...current,
+          session_id: event.session_id,
+        };
+
       case "chunk":
         return {
           ...current,

@@ -8,6 +8,7 @@ import {
 } from "@ant-design/icons";
 import { Actions, Bubble } from "@ant-design/x";
 import type { ChatMessageOut, SourceSummary } from "../_types";
+import { shouldRenderAssistantAnswer } from "../_lib/message-utils";
 import MarkdownAnswer from "./MarkdownAnswer";
 import SourceChips from "./SourceChips";
 
@@ -41,6 +42,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
   onSelectSource,
 }: ChatMessageItemProps) {
   const hasAnswer = msg.answer.trim().length > 0;
+  const renderAssistantAnswer = shouldRenderAssistantAnswer(msg);
   const actionStyles = {
     item: { color: tertiaryTextColor },
   };
@@ -104,60 +106,62 @@ const ChatMessageItem = memo(function ChatMessageItem({
         </div>
       </div>
 
-      <div className="relative mt-3">
-        <div className="absolute -left-[42px] top-0 flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary-soft text-app-primary">
-          <RobotOutlined
-            style={{
-              color: primaryColor,
-              fontSize: 14,
-            }}
-          />
-        </div>
-        {hasAnswer ? (
-          <div className="group min-w-0">
-            <Card
-              size="small"
-              className="w-full shadow-none !border-app-border !bg-white"
-              styles={MESSAGE_CARD_STYLES}
+      {renderAssistantAnswer ? (
+        <div className="relative mt-3">
+          <div className="absolute -left-[42px] top-0 flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-app-primary-soft text-app-primary">
+            <RobotOutlined
               style={{
-                borderRadius: answerBorderRadius,
+                color: primaryColor,
+                fontSize: 14,
               }}
-            >
-              <MarkdownAnswer content={msg.answer} />
-            </Card>
-            <div className="mt-1 flex min-h-7 items-start justify-between gap-3">
-              <SourceChips
-                citations={msg.citations}
-                onSelectSource={onSelectSource}
-              />
-              <Actions
-                variant="borderless"
-                className="shrink-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"
-                styles={actionStyles}
-                items={[
-                  {
-                    key: "copy",
-                    actionRender: () => (
-                      <Actions.Copy
-                        text={msg.answer}
-                        style={{ color: tertiaryTextColor }}
-                      />
-                    ),
-                  },
-                  {
-                    key: "fork",
-                    icon: <BranchesOutlined />,
-                    label: "分叉",
-                    onItemClick: () => onForkAnswer(msg),
-                  },
-                ]}
-              />
-            </div>
+            />
           </div>
-        ) : (
-          <Bubble loading content={null} />
-        )}
-      </div>
+          {hasAnswer ? (
+            <div className="group min-w-0">
+              <Card
+                size="small"
+                className="w-full shadow-none !border-app-border !bg-white"
+                styles={MESSAGE_CARD_STYLES}
+                style={{
+                  borderRadius: answerBorderRadius,
+                }}
+              >
+                <MarkdownAnswer content={msg.answer} />
+              </Card>
+              <div className="mt-1 flex min-h-7 items-start justify-between gap-3">
+                <SourceChips
+                  citations={msg.citations}
+                  onSelectSource={onSelectSource}
+                />
+                <Actions
+                  variant="borderless"
+                  className="shrink-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"
+                  styles={actionStyles}
+                  items={[
+                    {
+                      key: "copy",
+                      actionRender: () => (
+                        <Actions.Copy
+                          text={msg.answer}
+                          style={{ color: tertiaryTextColor }}
+                        />
+                      ),
+                    },
+                    {
+                      key: "fork",
+                      icon: <BranchesOutlined />,
+                      label: "分叉",
+                      onItemClick: () => onForkAnswer(msg),
+                    },
+                  ]}
+                />
+              </div>
+            </div>
+          ) : (
+            <Bubble loading content={null} />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 });
