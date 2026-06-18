@@ -1,10 +1,7 @@
 import { memo } from "react";
 import { Button, Card, Typography } from "antd";
-import {
-  CopyOutlined,
-  RobotOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { CopyOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
+import { Bubble } from "@ant-design/x";
 import type { ChatMessageOut, SourceSummary } from "../_types";
 import MarkdownAnswer from "./MarkdownAnswer";
 import SourceChips from "./SourceChips";
@@ -118,7 +115,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
             </div>
           </div>
         ) : (
-          <div className="flex items-end h-8">正在思考...</div>
+          <Bubble loading content={null} />
         )}
       </div>
     </div>
