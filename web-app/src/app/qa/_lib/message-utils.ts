@@ -33,6 +33,14 @@ export function shouldRenderAssistantAnswer(message: ChatMessageOut): boolean {
   );
 }
 
+const NON_FORKABLE_RESULT_STATUSES = new Set(["streaming", "aborted", "error"]);
+
+export function canForkChatMessage(message: ChatMessageOut): boolean {
+  return (
+    message.id > 0 && !NON_FORKABLE_RESULT_STATUSES.has(message.result_status)
+  );
+}
+
 function getCitationDocumentName(citation: CitationItem): string {
   return (
     citation.document_name?.trim() ||
