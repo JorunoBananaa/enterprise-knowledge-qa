@@ -26,8 +26,13 @@ from app.schemas.chat import (
     ChatMessageOut,
     ChatSessionDetail,
     ChatSessionOut,
+    ForkSessionResponse,
 )
 from app.services.embedding_factory import create_embeddings
+from app.services.chat_branching import (
+    ChatBranchTargetNotFound,
+    fork_chat_session_at_message,
+)
 from app.services.chat_persistence import (
     persist_new_chat_session,
     persist_streamed_chat_message,
@@ -480,6 +485,25 @@ def delete_session(
 
     db.delete(session)
     db.commit()
+
+
+@router.post("/messages/{message_id}/fork", response_model=ForkSessionResponse)
+def fork_message(
+    message_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ForkSessionResponse:
+    """Fork a chat session at a completed message."""
+    try:
+        new_session = fork_chat_session_at_message(
+            db,
+            user_id=str(current_user.id),
+            message_id=message_id,
+        )
+    except ChatBranchTargetNotFound:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    return ForkSessionResponse(session_id=new_session.id)
 
 
 # ── Ask (streaming) ───────────────────────────────────────────────────

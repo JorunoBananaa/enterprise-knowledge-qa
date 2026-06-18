@@ -61,3 +61,7 @@ class ChatSessionOut(BaseModel):
 
 class ChatSessionDetail(ChatSessionOut):
     messages: list[ChatMessageOut] = []
+
+
+class ForkSessionResponse(BaseModel):
+    session_id: int
