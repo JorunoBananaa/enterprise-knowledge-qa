@@ -1,7 +1,12 @@
 import { memo } from "react";
-import { Button, Card, Typography } from "antd";
-import { CopyOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
-import { Bubble } from "@ant-design/x";
+import { Card, Typography } from "antd";
+import {
+  BranchesOutlined,
+  EditOutlined,
+  RobotOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { Actions, Bubble } from "@ant-design/x";
 import type { ChatMessageOut, SourceSummary } from "../_types";
 import MarkdownAnswer from "./MarkdownAnswer";
 import SourceChips from "./SourceChips";
@@ -18,7 +23,9 @@ interface ChatMessageItemProps {
   tertiaryTextColor: string;
   questionBorderRadius: string;
   answerBorderRadius: string;
-  onCopyAnswer: (text: string) => void;
+  lastIndex?: boolean;
+  onEditQuestion: (message: ChatMessageOut) => void;
+  onForkAnswer: (message: ChatMessageOut) => void;
   onSelectSource: (source: SourceSummary) => void;
 }
 
@@ -28,10 +35,15 @@ const ChatMessageItem = memo(function ChatMessageItem({
   tertiaryTextColor,
   questionBorderRadius,
   answerBorderRadius,
-  onCopyAnswer,
+  lastIndex,
+  onEditQuestion,
+  onForkAnswer,
   onSelectSource,
 }: ChatMessageItemProps) {
   const hasAnswer = msg.answer.trim().length > 0;
+  const actionStyles = {
+    item: { color: tertiaryTextColor },
+  };
 
   return (
     <div
@@ -60,14 +72,30 @@ const ChatMessageItem = memo(function ChatMessageItem({
             </Paragraph>
           </Card>
           <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out">
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => onCopyAnswer(msg.question)}
-              style={{
-                color: tertiaryTextColor,
-              }}
+            <Actions
+              variant="borderless"
+              styles={actionStyles}
+              items={[
+                {
+                  key: "copy",
+                  actionRender: () => (
+                    <Actions.Copy
+                      text={msg.question}
+                      style={{ color: tertiaryTextColor }}
+                    />
+                  ),
+                },
+                ...(lastIndex
+                  ? [
+                      {
+                        key: "edit",
+                        icon: <EditOutlined />,
+                        label: "编辑",
+                        onItemClick: () => onEditQuestion(msg),
+                      },
+                    ]
+                  : []),
+              ]}
             />
           </div>
         </div>
@@ -102,15 +130,27 @@ const ChatMessageItem = memo(function ChatMessageItem({
                 citations={msg.citations}
                 onSelectSource={onSelectSource}
               />
-              <Button
-                type="text"
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={() => onCopyAnswer(msg.answer)}
+              <Actions
+                variant="borderless"
                 className="shrink-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"
-                style={{
-                  color: tertiaryTextColor,
-                }}
+                styles={actionStyles}
+                items={[
+                  {
+                    key: "copy",
+                    actionRender: () => (
+                      <Actions.Copy
+                        text={msg.answer}
+                        style={{ color: tertiaryTextColor }}
+                      />
+                    ),
+                  },
+                  {
+                    key: "fork",
+                    icon: <BranchesOutlined />,
+                    label: "分叉",
+                    onItemClick: () => onForkAnswer(msg),
+                  },
+                ]}
               />
             </div>
           </div>

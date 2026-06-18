@@ -39,10 +39,7 @@ import type {
   SourceSummary,
 } from "./_types";
 import { EMPTY_DOCUMENTS } from "./_lib/constants";
-import {
-  buildCatTree,
-  replaceCurrentSessionUrl,
-} from "./_lib/category-tree";
+import { buildCatTree, replaceCurrentSessionUrl } from "./_lib/category-tree";
 import { normalizeMessageAnswer } from "./_lib/message-utils";
 import {
   createPendingQAChatMessage,
@@ -312,13 +309,15 @@ function QAPageContent() {
 
   useEffect(() => () => scrollToBottom.cancel(), [scrollToBottom]);
 
-  // ── copy answer to clipboard ────────────────────────────────────
-  const handleCopyAnswer = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).then(
-      () => message.success("已复制到剪贴板"),
-      () => message.error("复制失败"),
-    );
+  const handleEditQuestion = useCallback((msg: ChatMessageOut) => {
+    console.log("edit question", msg);
   }, []);
+  const handleForkAnswer = useCallback(
+    (msg: ChatMessageOut) => {
+      console.log("fork answer", msg);
+    },
+    [handleAsk],
+  );
   const handleSelectSource = useCallback((source: SourceSummary) => {
     setSourceDetail(source);
   }, []);
@@ -431,7 +430,7 @@ function QAPageContent() {
           ) : (
             <div className="w-full max-w-[784px] mx-auto px-10 sm:px-12 cursor-default">
               <Space direction="vertical" size={28} style={{ width: "100%" }}>
-                {messages.map((msg) => (
+                {messages.map((msg, index) => (
                   <ChatMessageItem
                     key={msg.id}
                     message={msg}
@@ -439,8 +438,10 @@ function QAPageContent() {
                     tertiaryTextColor={token.colorTextTertiary}
                     questionBorderRadius={questionBorderRadius}
                     answerBorderRadius={answerBorderRadius}
-                    onCopyAnswer={handleCopyAnswer}
+                    onEditQuestion={handleEditQuestion}
+                    onForkAnswer={handleForkAnswer}
                     onSelectSource={handleSelectSource}
+                    lastIndex={index === messages.length - 1}
                   />
                 ))}
                 <div ref={bottomRef} />
