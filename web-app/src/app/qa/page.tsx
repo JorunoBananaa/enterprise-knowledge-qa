@@ -21,10 +21,11 @@ import {
 } from "antd";
 import { FilterOutlined, RobotOutlined } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
+import { useXChat, type MessageInfo } from "@ant-design/x-sdk";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { throttle } from "@/lib/utils";
-import { apiFetch, apiFetchStream } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import ChatMessageItem from "./_components/ChatMessageItem";
 import QAScopeDrawer from "./_components/QAScopeDrawer";
 import SourceDetailModal from "./_components/SourceDetailModal";
@@ -37,15 +38,17 @@ import type {
   SessionItem,
   SourceSummary,
 } from "./_types";
-import {
-  EMPTY_DOCUMENTS,
-  INSUFFICIENT_EVIDENCE_ANSWER,
-} from "./_lib/constants";
+import { EMPTY_DOCUMENTS } from "./_lib/constants";
 import {
   buildCatTree,
   replaceCurrentSessionUrl,
 } from "./_lib/category-tree";
 import { normalizeMessageAnswer } from "./_lib/message-utils";
+import {
+  createPendingQAChatMessage,
+  createQAChatProvider,
+  type QAAskInput,
+} from "./_lib/qa-chat-provider";
 
 const { Text } = Typography;
 
@@ -73,9 +76,7 @@ function QAPageContent() {
   const sessionIdParam = searchParams.get("session_id");
 
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<ChatMessageOut[]>([]);
   const [question, setQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
   const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(
     undefined,
   );
@@ -94,6 +95,60 @@ function QAPageContent() {
   // ── computed scope state ──
   const scopeTotal = scopeCategoryIds.length + scopeDocumentIds.length;
   const scopeLabel = scopeTotal === 0 ? "全部知识库" : `已选 ${scopeTotal} 项`;
+
+  // ── chat provider ──
+  const [provider] = useState(createQAChatProvider);
+  const requestPlaceholder = useCallback(
+    (requestParams: Partial<QAAskInput>) =>
+      createPendingQAChatMessage(requestParams.question?.trim() || ""),
+    [],
+  );
+  const requestFallback = useCallback(
+    (
+      requestParams: Partial<QAAskInput>,
+      {
+        error,
+        messageInfo,
+      }: {
+        error: Error;
+        messageInfo?: MessageInfo<ChatMessageOut>;
+      },
+    ) => {
+      const base =
+        messageInfo?.message ||
+        createPendingQAChatMessage(requestParams.question?.trim() || "");
+
+      if (error.name !== "AbortError") {
+        message.error(error.message || "获取答案失败");
+      }
+
+      return {
+        ...base,
+        answer:
+          base.answer ||
+          (error.name === "AbortError"
+            ? "已停止生成"
+            : error.message || "获取答案失败"),
+        result_status: error.name === "AbortError" ? "aborted" : "error",
+      };
+    },
+    [],
+  );
+  const {
+    messages: chatMessageInfos,
+    setMessages: setChatMessageInfos,
+    onRequest,
+    isRequesting,
+    abort,
+  } = useXChat<ChatMessageOut, ChatMessageOut, QAAskInput>({
+    provider,
+    requestPlaceholder,
+    requestFallback,
+  });
+  const messages = useMemo(
+    () => chatMessageInfos.map((info) => normalizeMessageAnswer(info.message)),
+    [chatMessageInfos],
+  );
 
   // ── load session list ──
   const { data: sessions = [], run: loadSessions } =
@@ -147,7 +202,15 @@ function QAPageContent() {
   const { loading: messagesLoading, run: loadMessages } = useRequest(
     async (sessionId: number) => {
       const data = await apiFetch<SessionDetail>(`/qa/sessions/${sessionId}`);
-      setMessages((data.messages ?? []).map(normalizeMessageAnswer));
+      setChatMessageInfos(
+        (data.messages ?? []).map(
+          (chatMessage): MessageInfo<ChatMessageOut> => ({
+            id: chatMessage.id,
+            message: normalizeMessageAnswer(chatMessage),
+            status: "success",
+          }),
+        ),
+      );
     },
     {
       manual: true,
@@ -161,7 +224,7 @@ function QAPageContent() {
     const rawSessionId = sessionIdParam;
     if (!rawSessionId) {
       setActiveId(null);
-      setMessages([]);
+      setChatMessageInfos([]);
       localSessionUrlSyncRef.current = null;
       return;
     }
@@ -169,7 +232,7 @@ function QAPageContent() {
     const nextSessionId = Number(rawSessionId);
     if (!Number.isFinite(nextSessionId)) {
       setActiveId(null);
-      setMessages([]);
+      setChatMessageInfos([]);
       localSessionUrlSyncRef.current = null;
       return;
     }
@@ -181,12 +244,32 @@ function QAPageContent() {
     }
 
     loadMessages(nextSessionId);
-  }, [sessionIdParam, loadMessages]);
+  }, [sessionIdParam, loadMessages, setChatMessageInfos]);
+
+  const streamedSessionId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const sessionId = messages[index].session_id;
+      if (sessionId != null) return sessionId;
+    }
+    return null;
+  }, [messages]);
+
+  useEffect(() => {
+    if (activeId || streamedSessionId == null) return;
+    if (localSessionUrlSyncRef.current === streamedSessionId) return;
+
+    localSessionUrlSyncRef.current = streamedSessionId;
+    setActiveId(streamedSessionId);
+    replaceCurrentSessionUrl(streamedSessionId);
+    Promise.resolve(loadSessions()).finally(() => {
+      window.dispatchEvent(new Event("qa:sessions-updated"));
+    });
+  }, [activeId, loadSessions, streamedSessionId]);
 
   // ── ask question (streaming) ────────────────────────────────────
 
   const handleAsk = useCallback(
-    async (msg?: string) => {
+    (msg?: string) => {
       const q = (msg ?? question).trim();
       if (!q) return;
       if (selectedLlmId === undefined) {
@@ -194,102 +277,18 @@ function QAPageContent() {
         return;
       }
       setQuestion("");
-      setLoading(true);
 
-      // Placeholder message that will be updated as tokens arrive.
-      const placeholder: ChatMessageOut = {
-        id: -Date.now(),
+      onRequest({
         question: q,
-        answer: "",
-        result_status: "streaming",
-        created_at: new Date().toISOString(),
-        citations: [],
-      };
-      setMessages((prev) => [...prev, placeholder]);
-      const placeholderId = placeholder.id;
-
-      try {
-        let sessionId = activeId;
-
-        for await (const event of apiFetchStream("/qa/ask/stream", {
-          method: "POST",
-          body: JSON.stringify({
-            question: q,
-            session_id: activeId,
-            llm_config_id: selectedLlmId ?? null,
-            category_ids: scopeCategoryIds.length > 0 ? scopeCategoryIds : null,
-            document_ids: scopeDocumentIds.length > 0 ? scopeDocumentIds : null,
-          }),
-        })) {
-          switch (event.type) {
-            case "chunk":
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholderId
-                    ? { ...m, answer: m.answer + event.text }
-                    : m,
-                ),
-              );
-              break;
-
-            case "citation":
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholderId
-                    ? {
-                        ...m,
-                        citations: [...(m.citations ?? []), event],
-                      }
-                    : m,
-                ),
-              );
-              break;
-
-            case "done": {
-              if (event.session_id != null) sessionId = event.session_id;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholderId
-                    ? {
-                        ...m,
-                        id: event.message_id ?? placeholderId,
-                        answer:
-                          m.answer ||
-                          (event.status === "insufficient_evidence"
-                            ? INSUFFICIENT_EVIDENCE_ANSWER
-                            : ""),
-                        result_status: event.status,
-                      }
-                    : m,
-                ),
-              );
-
-              if (!activeId && sessionId != null) {
-                localSessionUrlSyncRef.current = sessionId;
-                setActiveId(sessionId);
-                replaceCurrentSessionUrl(sessionId);
-                await loadSessions();
-                window.dispatchEvent(new Event("qa:sessions-updated"));
-              }
-              break;
-            }
-
-            case "error":
-              message.error(event.message);
-              setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-              break;
-          }
-        }
-      } catch (err) {
-        message.error(err instanceof Error ? err.message : "获取答案失败");
-        setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-      } finally {
-        setLoading(false);
-      }
+        session_id: activeId,
+        llm_config_id: selectedLlmId ?? null,
+        category_ids: scopeCategoryIds.length > 0 ? scopeCategoryIds : null,
+        document_ids: scopeDocumentIds.length > 0 ? scopeDocumentIds : null,
+      });
     },
     [
       activeId,
-      loadSessions,
+      onRequest,
       question,
       scopeCategoryIds,
       scopeDocumentIds,
@@ -472,8 +471,8 @@ function QAPageContent() {
               value={question}
               onChange={setQuestion}
               onSubmit={handleAsk}
-              loading={loading}
-              onCancel={() => setLoading(false)}
+              loading={isRequesting}
+              onCancel={abort}
               placeholder="向知识库提问，例如：报销标准是多少？"
               autoSize={{ minRows: 1, maxRows: 5 }}
               className="qa-compose"

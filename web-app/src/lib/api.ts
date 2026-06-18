@@ -24,6 +24,10 @@ function buildApiUrl(base: string, path: string): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+export function buildStreamApiUrl(path: string): string {
+  return buildApiUrl(resolveStreamApiBase(), path);
+}
+
 function currentPath(): string {
   if (typeof window === "undefined") return "/";
   return `${window.location.pathname}${window.location.search}`;
@@ -99,10 +103,10 @@ export type StreamEvent =
   | { type: "done"; status: string; session_id?: number; message_id?: number }
   | { type: "error"; message: string };
 
-export async function* apiFetchStream(
-  path: string,
+export async function apiStreamFetch(
+  baseURL: Parameters<typeof fetch>[0],
   options: RequestInit = {},
-): AsyncGenerator<StreamEvent, void, undefined> {
+): Promise<Response> {
   const headers: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {}),
   };
@@ -111,7 +115,7 @@ export async function* apiFetchStream(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(buildApiUrl(resolveStreamApiBase(), path), {
+  const res = await fetch(baseURL, {
     ...options,
     credentials: "include",
     headers: {
@@ -134,40 +138,5 @@ export async function* apiFetchStream(
     throw new Error("SSE 响应没有 body");
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let currentEvent = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      // Keep the last incomplete line in the buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("event: ")) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          const raw = line.slice(6);
-          if (currentEvent && raw) {
-            try {
-              const data = JSON.parse(raw);
-              yield { type: currentEvent, ...data } as StreamEvent;
-            } catch {
-              // Malformed JSON — skip
-            }
-          }
-          currentEvent = "";
-        }
-        // Empty lines are SSE frame separators — ignore
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+  return res;
 }

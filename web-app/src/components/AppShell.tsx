@@ -225,7 +225,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Layout className="flex flex-row min-h-screen bg-white">
+    <Layout className="!flex !flex-row min-h-screen bg-white">
       <aside className="sticky top-0 flex w-sidebar shrink-0 flex-col justify-between h-screen border-r border-app-border bg-[#f7f7f8] px-[13px] py-[18px] pb-[14px]">
         <div className="min-h-0">
           <div className="flex shrink-0 items-center gap-2.5 min-w-0 text-app-text cursor-default px-1">

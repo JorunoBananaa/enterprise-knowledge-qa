@@ -9,9 +9,8 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: [
-      "antd",
-      "@ant-design/icons",
       "@ant-design/x",
+      "@ant-design/x-sdk",
       "lodash",
     ],
   },
