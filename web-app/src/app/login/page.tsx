@@ -51,10 +51,10 @@ function LoginForm() {
           </span>
           <div>
             <span className="block leading-[18px] text-sm font-bold text-app-text">
-              企业知识问答
+              知识库问答
             </span>
             <span className="block leading-4 text-[11px] text-app-muted">
-              Enterprise Knowledge QA
+              Knowledge QA
             </span>
           </div>
         </div>
@@ -124,7 +124,7 @@ function LoginForm() {
         </Card>
 
         <Text type="secondary" className="mt-6 text-xs">
-          企业级知识库智能问答平台
+          知识库智能问答平台
         </Text>
       </main>
     </div>

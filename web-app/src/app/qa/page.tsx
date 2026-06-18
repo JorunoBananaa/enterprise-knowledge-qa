@@ -364,7 +364,7 @@ function QAPageContent() {
               {activeSessionTitle}
             </Text>
             <span className="text-app-muted text-xs">
-              基于企业内部知识库的检索增强问答
+              基于知识库的检索增强问答
             </span>
           </div>
           <Tag
@@ -425,7 +425,7 @@ function QAPageContent() {
                 type="secondary"
                 style={{ fontSize: 14, textAlign: "center", maxWidth: 400 }}
               >
-                基于企业知识库的智能问答助手，准确、高效地回答你的问题
+                基于知识库的智能问答助手，准确、高效地回答你的问题
               </Text>
             </div>
           ) : (

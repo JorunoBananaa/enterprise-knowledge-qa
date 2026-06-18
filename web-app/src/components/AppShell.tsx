@@ -237,7 +237,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 知识中枢
               </span>
               <span className="block leading-4 text-xs text-app-muted">
-                企业知识库助手
+                知识库助手
               </span>
             </span>
           </div>

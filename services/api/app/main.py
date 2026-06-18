@@ -62,7 +62,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Enterprise Knowledge QA API", lifespan=lifespan, redirect_slashes=False)
+app = FastAPI(title="Knowledge QA API", lifespan=lifespan, redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,

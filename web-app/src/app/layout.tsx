@@ -6,8 +6,8 @@ import "./globals.css";
 import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "企业知识问答系统",
-  description: "企业级知识库智能问答平台",
+  title: "知识库问答系统",
+  description: "知识库智能问答平台",
 };
 
 export default function RootLayout({
