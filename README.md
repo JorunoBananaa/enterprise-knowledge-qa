@@ -48,7 +48,7 @@ enterprise-knowledge-qa/
 │           │   └── routes/
 │           │       ├── auth.py         # 登录 / 登出 / 获取当前用户
 │           │       ├── categories.py   # 知识分类 CRUD
-│           │       ├── documents.py    # 文档上传 / 列表 / 删除 / 审核
+│           │       ├── documents.py    # 文档上传 / 列表 / 删除
 │           │       ├── llm_config.py   # LLM 配置 CRUD
 │           │       ├── prompts.py      # 提示词模板 CRUD
 │           │       ├── qa.py           # 问答接口（支持流式 SSE）
@@ -108,10 +108,9 @@ enterprise-knowledge-qa/
         │   ├── layout.tsx              # 根布局（Antd + i18n + AppShell）
         │   ├── login/
         │   │   └── page.tsx            # 登录页
-        │   ├── library/                # 知识库（文档列表）
+        │   ├── library/                # 知识库（文档列表 / 上传弹窗）
         │   │   ├── page.tsx
         │   │   ├── [id]/page.tsx       # 文档详情
-        │   │   └── upload/page.tsx     # 文档上传
         │   ├── qa/
         │   │   ├── page.tsx            # 问答页（会话历史 / 范围筛选 / 流式对话）
         │   │   ├── _components/
@@ -251,7 +250,7 @@ pnpm dev:web-app
 | -------------- | -------- | ----------------------------------- |
 | `/auth`        | 认证     | 登录、登出、当前用户                |
 | `/categories`  | 知识分类 | 分类列表、创建、更新、删除          |
-| `/documents`   | 文档管理 | 上传、列表、删除、审核              |
+| `/documents`   | 文档管理 | 上传、列表、删除                    |
 | `/llm-configs` | LLM 配置 | CRUD                                |
 | `/prompts`     | 提示词   | CRUD                                |
 | `/qa`          | 问答     | 会话列表、会话详情、删除会话、SSE 问答 |

@@ -113,6 +113,13 @@ function buildCatTree(items: CategoryItem[]): CatTreeNode[] {
   return roots;
 }
 
+function parseCategoryParam(value: string | null): number | null {
+  if (value == null) return null;
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 // ── document table columns ──
 
 const columns: ColumnsType<Document> = [
@@ -190,7 +197,7 @@ function LibraryPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const categoryParam = searchParams.get("category_id");
-  const selectedCategory = categoryParam != null ? Number(categoryParam) : null;
+  const selectedCategory = parseCategoryParam(categoryParam);
   const [status, setStatus] = useState<string>();
 
   // ── current user (for admin check) ──

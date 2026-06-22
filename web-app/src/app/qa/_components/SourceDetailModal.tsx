@@ -20,6 +20,12 @@ const SourceDetailModal = memo(function SourceDetailModal({
   onClose,
 }: SourceDetailModalProps) {
   const citationCount = sourceDetail?.citations.length ?? 0;
+  const categoryHref =
+    sourceDetail?.categoryId != null &&
+    Number.isInteger(sourceDetail.categoryId) &&
+    sourceDetail.categoryId > 0
+      ? `/library?category_id=${sourceDetail.categoryId}`
+      : null;
 
   return (
     <Modal
@@ -71,13 +77,18 @@ const SourceDetailModal = memo(function SourceDetailModal({
                   <FolderOpenOutlined className="text-[13px]" />
                   目录路径
                 </span>
-                <Link
-                  href={`/library?category_id=${sourceDetail.categoryId}`}
-                  rel="noopener noreferrer"
-                  className="min-w-0 break-words rounded-md bg-app-accent px-2.5 py-1.5 text-app-primary"
-                >
-                  {sourceDetail.document_path}
-                </Link>
+                {categoryHref ? (
+                  <Link
+                    href={categoryHref}
+                    className="min-w-0 break-words rounded-md bg-app-accent px-2.5 py-1.5 text-app-primary"
+                  >
+                    {sourceDetail.document_path}
+                  </Link>
+                ) : (
+                  <span className="min-w-0 break-words rounded-md bg-app-accent px-2.5 py-1.5 text-app-muted">
+                    {sourceDetail.document_path}
+                  </span>
+                )}
               </div>
             ) : null}
           </section>
