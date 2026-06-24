@@ -16,7 +16,8 @@
 | **AI / LLM** | LangChain                                                  | 统一 LLM & Embedding 调用抽象  |
 | **向量化**   | HuggingFace (默认) / OpenAI / DeepSeek / 智谱 / 通义千问   | 多提供商 Embedding             |
 | **大模型**   | DeepSeek / OpenAI / Anthropic / 智谱 / 通义千问 / Moonshot | 多提供商 LLM                   |
-| **文档解析** | PyPDF / python-docx / python-pptx / openpyxl               | PDF、Word、PPT、Excel          |
+| **文档解析** | PyPDF / python-docx / python-pptx / openpyxl               | PDF、Word、PPT、Excel、TXT、Markdown、CSV |
+| **OCR**      | PaddleOCR-VL（百度智能云 AI Studio）                        | 文档内嵌图片文字识别             |
 | **认证**     | JWT (python-jose) + bcrypt + HttpOnly Cookie               | 无状态鉴权                     |
 | **部署**     | Docker Compose                                             | 一键启动 PostgreSQL + pgvector |
 
@@ -90,11 +91,14 @@ enterprise-knowledge-qa/
 │           │
 │           └── services/              # 业务服务层
 │               ├── rag.py             # RAG 问答核心（检索增强生成 + 流式）
-│               ├── ingestion.py       # 文档解析 & 文本分块（PDF/Word/PPT/Excel）
+│               ├── ingestion.py       # 文档解析 & 文本分块（PDF/Word/PPT/Excel/TXT/MD/CSV）
 │               ├── indexing.py        # 文档向量化 & pgvector 入索引
 │               ├── embedding_factory.py # Embedding 模型工厂（多提供商）
 │               ├── llm_factory.py     # LLM 模型工厂（多提供商）
 │               ├── prompt_composer.py # 提示词组装（系统提示词 + 上下文 + 问题）
+│               ├── ocr.py             # 图片 OCR 文字识别（PaddleOCR-VL）
+│               ├── chat_branching.py  # 会话分支（从指定消息 fork 新会话）
+│               ├── chat_persistence.py # 会话消息 & 引用持久化
 │               └── storage.py         # 文件存储（本地磁盘）
 │
 └── web-app/                            # ██ 前端 Web 应用（Next.js / React）
@@ -111,14 +115,21 @@ enterprise-knowledge-qa/
         │   ├── library/                # 知识库（文档列表 / 上传弹窗）
         │   │   ├── page.tsx
         │   │   ├── [id]/page.tsx       # 文档详情
-        │   ├── qa/
-        │   │   ├── page.tsx            # 问答页（会话历史 / 范围筛选 / 流式对话）
+        │   ├── qa/                     # 问答（会话历史 / 范围筛选 / 流式对话 / 编辑 / 分支 / 取消）
+        │   │   ├── page.tsx
+        │   │   ├── _types.ts           # 问答相关类型（消息、引用、会话、分类、文档等）
         │   │   ├── _components/
-        │   │   │   ├── ChatMessageItem.tsx
-        │   │   │   ├── QAScopeDrawer.tsx
-        │   │   │   └── SourceDetailModal.tsx
+        │   │   │   ├── ChatMessageItem.tsx  # 单条问答消息（问题 + 回答 + 引用 + 操作菜单）
+        │   │   │   ├── MarkdownAnswer.tsx   # Markdown 渲染回答内容
+        │   │   │   ├── QAScopeDrawer.tsx    # 检索范围筛选抽屉（分类树 + 文档列表）
+        │   │   │   ├── SourceChips.tsx      # 引用来源标签条
+        │   │   │   └── SourceDetailModal.tsx # 引用来源详情弹窗
         │   │   └── _lib/
-        │   │       └── qa-chat-provider.ts # Ant Design X provider + SSE 事件转换
+        │   │       ├── qa-chat-provider.ts  # Ant Design X provider + SSE 事件转换
+        │   │       ├── category-tree.ts     # 分类树构建
+        │   │       ├── constants.ts         # 问答常量（无证据兜底文案、空文档占位）
+        │   │       ├── message-utils.ts     # 消息工具（答案规范化、分支判断、来源聚合）
+        │   │       └── session-url.ts       # 会话 URL 同步工具
         │   ├── review/
         │   │   └── page.tsx            # 审核页
         │   ├── llm-configs/
@@ -182,12 +193,12 @@ flowchart LR
 | -------------- | ------------------------------------------------------------------------------------------ |
 | **用户认证**   | 登录 / 登出 / JWT HttpOnly Cookie / 角色（admin / standard）                               |
 | **知识分类**   | 树形分类浏览；管理员可新建、编辑、删除分类，删除分类会级联下级分类和关联文档               |
-| **知识库管理** | 按分类查看文档，上传 PDF / Word / PPT / Excel，查看详情，删除文档                          |
+| **知识库管理** | 按分类查看文档，上传 PDF / Word / PPT / Excel / TXT / Markdown / CSV，查看详情，删除文档     |
 | **文档审核**   | 上传 → 待审核 → 通过 / 驳回 → 通过后自动索引                                               |
-| **文档索引**   | 文本分块（1000 字 / 200 字重叠）→ Embedding 向量化 → pgvector 存储                         |
+| **文档索引**   | 文本分块（1000 字 / 200 字重叠）→ 内嵌图片 OCR 识别 → Embedding 向量化 → pgvector 存储      |
 | **提示词管理** | 系统提示词 & 用户提示词模板 CRUD，支持变量 `{{question}}` `{{context}}`                    |
 | **LLM 配置**   | 多提供商、多模型、API Key 管理，支持设置活跃模型和测试模型可用性                           |
-| **知识问答**   | 会话历史、模型选择、分类/文档范围筛选、追问检索改写、SSE 流式回答、引用来源聚合与详情查看 |
+| **知识问答**   | 会话历史、模型选择、分类/文档范围筛选、追问检索改写、SSE 流式回答、引用来源聚合与详情查看、问题编辑重新生成、取消生成、从回答创建分支会话、无引用证据兜底提示 |
 | **用户管理**   | 管理员：新建 / 启用 / 禁用用户                                                             |
 
 ---
@@ -253,7 +264,7 @@ pnpm dev:web-app
 | `/documents`   | 文档管理 | 上传、列表、删除                    |
 | `/llm-configs` | LLM 配置 | CRUD                                |
 | `/prompts`     | 提示词   | CRUD                                |
-| `/qa`          | 问答     | 会话列表、会话详情、删除会话、SSE 问答 |
+| `/qa`          | 问答     | 会话列表、会话详情、删除会话、SSE 问答、取消生成、问题编辑重新生成、消息分支 |
 | `/review`      | 审核     | 文档审核工作流                      |
 | `/users`       | 用户管理 | CRUD（管理员权限）                  |
 
@@ -263,22 +274,41 @@ pnpm dev:web-app
 
 前端通过 Ant Design X SDK 自定义 `QAChatProvider` 调用 `POST /qa/ask/stream`。请求体支持：
 
-| 字段            | 类型             | 说明                                     |
-| --------------- | ---------------- | ---------------------------------------- |
-| `question`      | `string`         | 用户问题                                 |
-| `session_id`    | `number \| null` | 已有会话 ID；为空时后端会自动创建新会话 |
-| `llm_config_id` | `number \| null` | 指定 LLM 配置；为空时使用活跃配置       |
-| `category_ids`  | `number[] \| null` | 检索范围：分类及其子分类                 |
-| `document_ids`  | `number[] \| null` | 检索范围：指定文档                       |
+| 字段              | 类型               | 说明                                            |
+| ----------------- | ------------------ | ----------------------------------------------- |
+| `question`        | `string`           | 用户问题                                        |
+| `session_id`      | `number \| null`   | 已有会话 ID；为空时后端会自动创建新会话         |
+| `llm_config_id`   | `number \| null`   | 指定 LLM 配置；为空时使用活跃配置               |
+| `category_ids`    | `number[] \| null` | 检索范围：分类及其子分类                        |
+| `document_ids`    | `number[] \| null` | 检索范围：指定文档                              |
+| `request_id`      | `string \| null`   | 客户端生成的请求 ID，用于取消生成               |
+| `edit_message_id` | `number \| null`   | 编辑模式：截断该消息及后续消息后以新问题重新生成 |
 
 SSE 事件：
 
 | 事件       | 说明                                                        |
 | ---------- | ----------------------------------------------------------- |
+| `session`  | 会话已创建 / 解析：`{"session_id": 123}`                    |
 | `chunk`    | 增量回答文本：`{"text": "..."}`                             |
 | `citation` | 引用来源片段，包含文档 ID、标题、分类路径、chunk ID、预览等 |
-| `done`     | 流式完成，返回状态、会话 ID 和消息 ID                       |
+| `done`     | 流式完成，返回状态（`answered` / `insufficient_evidence`）、会话 ID 和消息 ID |
 | `error`    | 流式失败信息                                                |
+
+`result_status` 取值：`streaming`（生成中）、`answered`（已回答）、`insufficient_evidence`（无引用证据，使用兜底文案）、`aborted`（已取消）、`error`（失败）。
+
+## 取消生成
+
+前端通过 `POST /qa/ask/cancel` 取消进行中的流式问答。请求体：
+
+```json
+{ "request_id": "..." }
+```
+
+后端会取消对应的流式任务并将已生成的部分保存为 `aborted` 状态的消息。返回 `{"cancelled": true | false}`。
+
+## 编辑问题重新生成
+
+在 `POST /qa/ask/stream` 请求体中传入 `edit_message_id`，后端会删除该消息及其后续所有消息，然后以新的 `question` 重新生成回答。前端在编辑模式下会先乐观地截断消息列表，再发起流式请求。
 
 ## 问答分支
 
@@ -312,6 +342,7 @@ SSE 事件：
 | `EMBEDDING_MODEL_NAME`        | `sentence-transformers/all-MiniLM-L6-v2`                     | Embedding 模型 |
 | `EMBEDDING_DIMENSION`         | `384`                                                        | 向量维度       |
 | `UPLOAD_DIR`                  | `storage/uploads`                                            | 文件上传目录   |
+| `PADDLEOCR_TOKEN`             | 内置演示 Token                                               | PaddleOCR API Token（图片 OCR，可选） |
 
 ### 开发脚本
 

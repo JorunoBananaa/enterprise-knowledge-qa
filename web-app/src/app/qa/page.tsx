@@ -20,7 +20,7 @@ import {
   theme,
 } from "antd";
 import { FilterOutlined, RobotOutlined } from "@ant-design/icons";
-import { Sender } from "@ant-design/x";
+import { Sender, SenderProps } from "@ant-design/x";
 import { useXChat, type MessageInfo } from "@ant-design/x-sdk";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
@@ -92,6 +92,8 @@ function QAPageContent() {
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const [forkingMessageId, setForkingMessageId] = useState<number | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editQuestion, setEditQuestion] = useState("");
   const [question, setQuestion] = useState("");
   const [selectedLlmId, setSelectedLlmId] = useState<number | undefined>(
     undefined,
@@ -308,7 +310,7 @@ function QAPageContent() {
   // ── ask question (streaming) ────────────────────────────────────
 
   const handleAsk = useCallback(
-    (msg?: string) => {
+    (msg?: string, editMessageId?: number | null) => {
       const q = (msg ?? question).trim();
       if (!q) return;
       if (selectedLlmId === undefined) {
@@ -316,6 +318,23 @@ function QAPageContent() {
         return;
       }
       setQuestion("");
+
+      // 编辑模式：乐观更新前端消息列表（移除编辑消息及后续消息）
+      // 注意：editMessageId 必须是有效的数字，过滤掉 Sender onSubmit 误传的 slotConfig 数组
+      const effectiveEditId =
+        typeof editMessageId === "number" ? editMessageId : editingMessageId;
+      if (effectiveEditId != null) {
+        setChatMessageInfos((prev) => {
+          const editIndex = prev.findIndex(
+            (info) => info.message.id === effectiveEditId,
+          );
+          if (editIndex === -1) return prev;
+          return prev.slice(0, editIndex);
+        });
+        setEditingMessageId(null);
+        setEditQuestion("");
+      }
+
       const requestId = createRequestId();
       activeRequestIdRef.current = requestId;
 
@@ -326,15 +345,18 @@ function QAPageContent() {
         category_ids: scopeCategoryIds.length > 0 ? scopeCategoryIds : null,
         document_ids: scopeDocumentIds.length > 0 ? scopeDocumentIds : null,
         request_id: requestId,
+        edit_message_id: effectiveEditId,
       });
     },
     [
       activeId,
+      editingMessageId,
       onRequest,
       question,
       scopeCategoryIds,
       scopeDocumentIds,
       selectedLlmId,
+      setChatMessageInfos,
     ],
   );
 
@@ -376,8 +398,22 @@ function QAPageContent() {
   useEffect(() => () => scrollToBottom.cancel(), [scrollToBottom]);
 
   const handleEditQuestion = useCallback((msg: ChatMessageOut) => {
-    console.log("edit question", msg);
+    setEditingMessageId(msg.id);
+    setEditQuestion(msg.question);
   }, []);
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditQuestion("");
+  }, []);
+  // 内联编辑发送框提交：将 editQuestion 值和编辑消息 ID 传入 handleAsk
+  const handleInlineEditSubmit: SenderProps["onSubmit"] = useCallback(
+    (val) => {
+      const q = (typeof val === "string" ? val : editQuestion).trim();
+      if (!q) return;
+      handleAsk(q, editingMessageId);
+    },
+    [editQuestion, editingMessageId, handleAsk],
+  );
   const handleForkAnswer = useCallback(
     async (msg: ChatMessageOut) => {
       if (!canForkChatMessage(msg) || forkingMessageId !== null) return;
@@ -524,6 +560,12 @@ function QAPageContent() {
                       forking={forkingMessageId === msg.id}
                       onSelectSource={handleSelectSource}
                       lastIndex={index === normalizedChatMessageInfos.length - 1}
+                      editing={editingMessageId === msg.id}
+                      editValue={editQuestion}
+                      onEditChange={setEditQuestion}
+                      onEditSubmit={handleInlineEditSubmit}
+                      onEditCancel={handleCancelEdit}
+                      isRequesting={isRequesting}
                     />
                   );
                 })}

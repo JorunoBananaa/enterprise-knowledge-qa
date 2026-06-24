@@ -192,6 +192,52 @@ def _load_chat_history(
     ]
 
 
+def _truncate_session_from_message(
+    db: Session,
+    *,
+    session_id: int,
+    edit_message_id: int,
+) -> None:
+    """Delete the target message and all subsequent messages in the session.
+
+    Used by the edit-question flow: the edited question and its answer (and
+    every message after it) are removed so a fresh answer can be regenerated.
+    """
+    target = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.id == edit_message_id,
+            ChatMessage.session_id == session_id,
+        )
+        .first()
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="编辑的消息不存在")
+
+    # Select messages at or after the target (by created_at, then id)
+    messages_to_delete = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .filter(
+            (ChatMessage.created_at > target.created_at)
+            | (
+                (ChatMessage.created_at == target.created_at)
+                & (ChatMessage.id >= target.id)
+            )
+        )
+        .all()
+    )
+    message_ids = [m.id for m in messages_to_delete]
+    if message_ids:
+        db.query(Citation).filter(
+            Citation.chat_message_id.in_(message_ids)
+        ).delete(synchronize_session=False)
+        db.query(ChatMessage).filter(
+            ChatMessage.id.in_(message_ids)
+        ).delete(synchronize_session=False)
+        db.commit()
+
+
 def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
     """Given a list of category IDs, return all IDs including descendants."""
     all_cats = db.query(KnowledgeCategory).all()
@@ -578,6 +624,14 @@ async def ask_question_stream(
 
     try:
         session = _resolve_session(user_id, payload.session_id, payload.question, db)
+
+        # 编辑模式：截断目标消息及其后续消息，然后重新生成
+        if payload.edit_message_id is not None:
+            _truncate_session_from_message(
+                db,
+                session_id=session.id,
+                edit_message_id=payload.edit_message_id,
+            )
 
         if await _should_stop():
             _persist_pre_stream_abort()

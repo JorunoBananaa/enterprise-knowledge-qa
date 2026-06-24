@@ -14,6 +14,7 @@ class AskRequest(BaseModel):
     category_ids: list[int] | None = None  # None / [] → search all categories
     document_ids: list[int] | None = None  # None / [] → search all documents
     request_id: str | None = None
+    edit_message_id: int | None = None  # 编辑模式：截断该消息及其后续消息后重新生成
 
 
 class AskCancelRequest(BaseModel):
