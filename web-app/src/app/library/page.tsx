@@ -29,7 +29,6 @@ import {
   Alert,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { DataNode } from "antd/es/tree";
 import type { UploadProps } from "antd";
 import {
   PlusOutlined,
@@ -47,8 +46,10 @@ import { getCurrentUser } from "@/lib/auth-client";
 import { useRequest } from "ahooks";
 import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 import PageHeader from "@/components/PageHeader";
+import { buildCatTree } from "@/app/qa/_lib/category-tree";
+import type { CatTreeNode } from "@/app/qa/_types";
 
-// ── types ──
+// ── 类型定义 ──
 
 interface Document {
   id: number;
@@ -67,51 +68,7 @@ interface CategoryItem {
   documents_count: number;
 }
 
-// ── build category tree for antd Tree ──
-
-interface CatTreeNode extends DataNode {
-  categoryId: number;
-  parentId: number | null;
-  /** raw children before cleaning */
-  _children?: CatTreeNode[];
-}
-
-function buildCatTree(items: CategoryItem[]): CatTreeNode[] {
-  const map = new Map<number, CatTreeNode>();
-  const roots: CatTreeNode[] = [];
-
-  for (const item of items) {
-    const node: CatTreeNode = {
-      key: `cat-${item.id}`,
-      title: item.name, // placeholder, overwritten by titleRender
-      categoryId: item.id,
-      parentId: item.parent_id,
-      _children: [],
-    };
-    map.set(item.id, node);
-  }
-
-  for (const node of map.values()) {
-    if (node.parentId != null && map.has(node.parentId)) {
-      map.get(node.parentId)!._children!.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  // clean empty children and remap to `children`
-  const clean = (nodes: CatTreeNode[]) => {
-    for (const node of nodes) {
-      if (node._children && node._children.length > 0) {
-        node.children = node._children;
-        clean(node._children);
-      }
-      delete node._children;
-    }
-  };
-  clean(roots);
-  return roots;
-}
+// ── 分类参数解析 ──
 
 function parseCategoryParam(value: string | null): number | null {
   if (value == null) return null;
@@ -144,18 +101,14 @@ const columns: ColumnsType<Document> = [
     dataIndex: "review_status",
     key: "review_status",
     width: 100,
-    render: (status: string) => (
-      <DocumentStatusBadge status={status} type="review" />
-    ),
+    render: (status: string) => <DocumentStatusBadge status={status} />,
   },
   {
     title: "索引",
     dataIndex: "index_status",
     key: "index_status",
     width: 100,
-    render: (status: string) => (
-      <DocumentStatusBadge status={status} type="index" />
-    ),
+    render: (status: string) => <DocumentStatusBadge status={status} />,
   },
 ];
 
@@ -298,12 +251,15 @@ function LibraryPageContent() {
   const [creatingParentId, setCreatingParentId] = useState<number | null>(null);
   const [catForm] = Form.useForm();
 
-  const openCreateCat = useCallback((parentId?: number) => {
-    setEditingCatId(null);
-    setCreatingParentId(parentId ?? null);
-    catForm.resetFields();
-    setCatModalOpen(true);
-  }, [catForm]);
+  const openCreateCat = useCallback(
+    (parentId?: number) => {
+      setEditingCatId(null);
+      setCreatingParentId(parentId ?? null);
+      catForm.resetFields();
+      setCatModalOpen(true);
+    },
+    [catForm],
+  );
 
   // ── upload modal ──
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -311,12 +267,15 @@ function LibraryPageContent() {
   const [uploadCategoryId, setUploadCategoryId] = useState<number | null>(null);
   const [uploadForm] = Form.useForm();
 
-  const openUploadModal = useCallback((categoryId: number) => {
-    setUploadFile(null);
-    setUploadCategoryId(categoryId);
-    uploadForm.resetFields();
-    setUploadModalOpen(true);
-  }, [uploadForm]);
+  const openUploadModal = useCallback(
+    (categoryId: number) => {
+      setUploadFile(null);
+      setUploadCategoryId(categoryId);
+      uploadForm.resetFields();
+      setUploadModalOpen(true);
+    },
+    [uploadForm],
+  );
 
   const {
     loading: uploading,
@@ -364,11 +323,14 @@ function LibraryPageContent() {
     accept: ".pdf,.docx,.pptx,.xlsx",
   };
 
-  const openEditCat = useCallback((record: CategoryItem) => {
-    setEditingCatId(record.id);
-    catForm.setFieldsValue({ name: record.name });
-    setCatModalOpen(true);
-  }, [catForm]);
+  const openEditCat = useCallback(
+    (record: CategoryItem) => {
+      setEditingCatId(record.id);
+      catForm.setFieldsValue({ name: record.name });
+      setCatModalOpen(true);
+    },
+    [catForm],
+  );
 
   const onCatSuccess = () => {
     setCatModalOpen(false);
@@ -480,7 +442,7 @@ function LibraryPageContent() {
     ],
   );
 
-  // ── tree node title render ──
+  // ── 树节点标题渲染 ──
   const renderTreeTitle = useCallback(
     (node: CatTreeNode) => (
       <div className="flex items-center w-full pr-1 group/tree relative">
@@ -508,7 +470,7 @@ function LibraryPageContent() {
     [getNodeMenuItems, isAdmin],
   );
 
-  // Attach title render to tree nodes (recursive)
+  // 将标题渲染附加到树节点（递归）
   const attachTitle = useCallback(
     (nodes: CatTreeNode[]): CatTreeNode[] =>
       nodes.map((node) => ({
@@ -521,10 +483,10 @@ function LibraryPageContent() {
     [renderTreeTitle],
   );
 
-  const renderedTree = useMemo(() => attachTitle(catTree), [
-    attachTitle,
-    catTree,
-  ]);
+  const renderedTree = useMemo(
+    () => attachTitle(catTree),
+    [attachTitle, catTree],
+  );
 
   // 默认选中第一个根分类
   useEffect(() => {

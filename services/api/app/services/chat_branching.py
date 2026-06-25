@@ -9,7 +9,7 @@ from app.models.chat import ChatMessage, ChatSession, Citation
 
 
 class ChatBranchTargetNotFound(Exception):
-    """Raised when the requested fork target is unavailable to this user."""
+    """当请求的分支目标对该用户不可用时抛出。"""
 
 
 def fork_chat_session_at_message(

@@ -9,8 +9,7 @@ from app.models.chat import ChatMessage, ChatSession, Citation
 
 
 def _first_line(text: str, max_len: int = 60) -> str:
-    line = text.split("\n")[0].strip()
-    return line[:max_len] + ("…" if len(line) > max_len else "")
+    """提取文本首行作为标题回退。"""
 
 
 def persist_new_chat_session(

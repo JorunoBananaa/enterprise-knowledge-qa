@@ -77,10 +77,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     defaultActiveConversationKey: "",
   });
 
-  // Track whether the initial user fetch has completed.
-  // We must NOT replace the whole component tree with a spinner on
-  // subsequent refreshes — that would unmount children (the page) and
-  // cause a visible full-page flash on every route change.
+  // 跟踪初始用户获取是否已完成。
+  // 在后续刷新时绝不能将整个组件树替换为加载动画 ——
+  // 否则会导致子组件（页面）卸载，每次路由变化都会出现
+  // 可见的全页闪烁。
   const userFirstLoadDone = useRef(false);
 
   // ── current user ──
@@ -168,11 +168,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   );
 
-  // Store currentSessionId via ref so the delete callback can read it
-  // without depending on useSearchParams at the top level.
+  // 通过 ref 存储 currentSessionId，使删除回调无需在
+  // 顶层依赖 useSearchParams 即可读取。
   const currentSessionIdRef = useRef<string | null>(null);
 
-  // Callback for SessionHistoryBlock to update the ref
+  // SessionHistoryBlock 用于更新 ref 的回调
   const handleCurrentSessionIdChange = useCallback((id: string | null) => {
     currentSessionIdRef.current = id;
   }, []);
@@ -188,7 +188,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         router.push("/login");
       },
       onError: () => {
-        // ignore network errors during logout
+        // 忽略退出登录时的网络错误
         router.push("/login");
       },
     },
@@ -386,7 +386,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           isQaPage ? "!p-0" : ""
         }`}
       >
-        {/* Route transition progress bar */}
+        {/* 路由切换进度条 */}
         <div
           className={`fixed top-0 left-0 z-[9999] h-[3px] w-0 bg-gradient-to-r from-[#171717] to-[#525252] rounded-r-[3px] opacity-0 transition-opacity duration-200 ease pointer-events-none ${
             navigating ? "opacity-100 animate-nav-progress-slide" : ""
@@ -399,8 +399,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 // ── SessionHistoryBlock ──────────────────────────────────────────────
-// Isolates useSearchParams() inside its own <Suspense> boundary so that
-// route changes don't trigger the outer layout Suspense / full-page reload.
+// 将 useSearchParams() 隔离在自己的 <Suspense> 边界内，
+// 使路由变化不会触发外层布局 Suspense / 全页重新加载。
 
 interface SessionHistoryBlockProps {
   conversations: QAConversationItem[];
@@ -439,12 +439,7 @@ function SessionHistoryBlock({
 
       router.push(`/qa?session_id=${sessionId}`);
     },
-    [
-      activeConversationKey,
-      onActiveConversationKeyChange,
-      pathname,
-      router,
-    ],
+    [activeConversationKey, onActiveConversationKeyChange, pathname, router],
   );
   const handleDeleteConversation = useCallback(
     (conversation: ConversationItemType) => {
@@ -463,7 +458,7 @@ function SessionHistoryBlock({
     [onDeleteSession],
   );
 
-  // Keep the parent in sync so the delete callback can check the current id
+  // 保持父组件同步，使删除回调可以检查当前 id
   useEffect(() => {
     onCurrentSessionIdChange(currentSessionId);
 

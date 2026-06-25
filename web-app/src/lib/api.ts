@@ -1,8 +1,9 @@
 import { buildLoginUrl } from "./auth-client";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE || "/api"
-).replace(/\/+$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "/api").replace(
+  /\/+$/,
+  "",
+);
 
 function resolveStreamApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_STREAM_API_BASE;
@@ -37,12 +38,12 @@ function redirectToLogin(): void {
   if (typeof window === "undefined") return;
   if (window.location.pathname === "/login") return;
 
-  // fire-and-forget clear the stale cookie before redirecting
+  // 发起即忘：重定向前先清除可能过期的 cookie
   fetch(`${API_BASE}/auth/logout`, {
     method: "POST",
     credentials: "include",
   }).catch(() => {
-    /* ignore */
+    /* 忽略 */
   });
 
   window.location.href = buildLoginUrl(currentPath());

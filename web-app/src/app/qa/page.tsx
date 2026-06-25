@@ -19,7 +19,7 @@ import {
   message,
   theme,
 } from "antd";
-import { isNull } from "lodash";
+import isNull from "lodash/isNull";
 import { FilterOutlined, RobotOutlined } from "@ant-design/icons";
 import { Sender, SenderProps } from "@ant-design/x";
 import { useXChat, type MessageInfo } from "@ant-design/x-sdk";
@@ -66,7 +66,9 @@ function getSessionConversationKey(sessionId: number | null): string {
   return sessionId == null ? DRAFT_CONVERSATION_KEY : `qa-session-${sessionId}`;
 }
 
-function getSessionIdFromConversationKey(conversationKey?: string): number | null {
+function getSessionIdFromConversationKey(
+  conversationKey?: string,
+): number | null {
   if (!conversationKey?.startsWith("qa-session-")) return null;
 
   const sessionId = Number(conversationKey.slice("qa-session-".length));
@@ -343,7 +345,8 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     if (activeId || streamedSessionId == null) return;
     if (localSessionUrlSyncRef.current === streamedSessionId) return;
 
-    const streamedConversationKey = getSessionConversationKey(streamedSessionId);
+    const streamedConversationKey =
+      getSessionConversationKey(streamedSessionId);
     if (conversationKey !== streamedConversationKey) {
       setConversationAliases((current) => ({
         ...current,
@@ -427,7 +430,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
         method: "POST",
         body: JSON.stringify({ request_id: requestId }),
       }).catch(() => {
-        /* best-effort cancellation */
+        /* 尽力取消 */
       });
     }
 
@@ -557,7 +560,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
         className="flex flex-col overflow-hidden border border-app-border rounded-app bg-white shadow-app"
         style={{ flex: 1 }}
       >
-        {/* Top bar */}
+        {/* 顶部栏 */}
         <div className="flex items-center gap-3 border-b border-app-border-soft bg-white px-6 py-[17px]">
           <div className="flex min-w-0 flex-1 flex-col leading-[1.35]">
             <Text ellipsis className="text-[15px] font-bold text-app-text">
@@ -576,7 +579,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
           </Tag>
         </div>
 
-        {/* Messages area */}
+        {/* 消息区域 */}
         <div className="flex-1 overflow-auto bg-white px-6 py-[34px] pb-7 cursor-default">
           {isDefaultMessagesRequesting ? (
             <div
@@ -664,10 +667,10 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
           )}
         </div>
 
-        {/* Input area — sticky bottom */}
+        {/* 输入区域 —— 固定在底部 */}
         <div className="border-t border-app-border-soft bg-white px-6 py-[14px] pb-4">
           <div className="w-full max-w-[768px] mx-auto">
-            {/* LLM selector */}
+            {/* 大模型选择器 */}
             <div className="flex items-center gap-2 mb-2 text-app-muted cursor-default">
               <RobotOutlined style={{ color: token.colorTextQuaternary }} />
               <Select
@@ -681,7 +684,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
               />
             </div>
 
-            {/* Input + send row */}
+            {/* 输入 + 发送行 */}
             <Sender
               value={question}
               onChange={setQuestion}

@@ -30,7 +30,7 @@ function LoginForm() {
     {
       manual: true,
       onError: () => {
-        // error is automatically captured by useRequest
+        // useRequest 会自动捕获错误
       },
     },
   );
@@ -43,7 +43,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex flex-col bg-app-bg">
-      {/* Brand header */}
+      {/* 品牌头部 */}
       <header className="flex items-center h-14 px-6 border-b border-app-border bg-white">
         <div className="flex items-center gap-2.5">
           <span className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-app bg-app-primary text-white text-base shadow-[0_8px_18px_rgb(23_23_23_/_0.12)]">
@@ -60,7 +60,7 @@ function LoginForm() {
         </div>
       </header>
 
-      {/* Login card */}
+      {/* 登录卡片 */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-10">
         <Card
           className="!w-[400px] !max-w-full !border-app-border !rounded-app !shadow-app-raised [&_input:-webkit-autofill]:![shadow:0_0_0_1000px_#fff_inset] [&_input:-webkit-autofill]:![text-fill-color:rgba(0,0,0,0.88)] [&_input:-webkit-autofill]:![transition:background-color_5000s_ease-in-out_0s]"

@@ -26,9 +26,11 @@ export default function DocumentDetailPage() {
   const rawId = params.id;
   const documentId = Array.isArray(rawId) ? rawId[0] : rawId;
 
-  const { data: doc, loading, error } = useApi<Document>(
-    `/documents/${documentId}`,
-  );
+  const {
+    data: doc,
+    loading,
+    error,
+  } = useApi<Document>(`/documents/${documentId}`);
 
   if (loading) return <LoadingSpinner />;
   if (error || !doc) {
@@ -64,10 +66,10 @@ export default function DocumentDetailPage() {
             {doc.category_id}
           </Descriptions.Item>
           <Descriptions.Item label="审核状态">
-            <DocumentStatusBadge status={doc.review_status} type="review" />
+            <DocumentStatusBadge status={doc.review_status} />
           </Descriptions.Item>
           <Descriptions.Item label="索引状态">
-            <DocumentStatusBadge status={doc.index_status} type="index" />
+            <DocumentStatusBadge status={doc.index_status} />
           </Descriptions.Item>
           <Descriptions.Item label="存储路径" span={2}>
             <code>{doc.storage_path}</code>

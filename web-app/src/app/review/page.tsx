@@ -137,14 +137,8 @@ export default function ReviewPage() {
                         <Text type="secondary">
                           · 上传者 #{doc.uploader_id}
                         </Text>
-                        <DocumentStatusBadge
-                          status={doc.review_status}
-                          type="review"
-                        />
-                        <DocumentStatusBadge
-                          status={doc.index_status}
-                          type="index"
-                        />
+                        <DocumentStatusBadge status={doc.review_status} />
+                        <DocumentStatusBadge status={doc.index_status} />
                       </Space>
                     }
                   />

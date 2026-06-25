@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 """
-LLM Factory – creates LangChain chat model instances from LLMConfig records.
+LLM 工厂 —— 从 LLMConfig 记录创建 LangChain 聊天模型实例。
 
-Supported providers:
-- deepseek   → ChatOpenAI (OpenAI-compatible, base_url=https://api.deepseek.com/v1)
+支持的提供商：
+- deepseek   → ChatOpenAI（OpenAI 兼容，base_url=https://api.deepseek.com/v1）
 - openai     → ChatOpenAI
-- anthropic  → ChatAnthropic (reserved for future)
-- zhipu      → ChatOpenAI (OpenAI-compatible, base_url=https://open.bigmodel.cn/api/paas/v4/)
-- qwen       → ChatOpenAI (OpenAI-compatible, via DashScope)
-- moonshot   → ChatOpenAI (OpenAI-compatible, base_url=https://api.moonshot.cn/v1)
+- anthropic  → ChatAnthropic（预留）
+- zhipu      → ChatOpenAI（OpenAI 兼容，base_url=https://open.bigmodel.cn/api/paas/v4/）
+- qwen       → ChatOpenAI（OpenAI 兼容，通过 DashScope）
+- moonshot   → ChatOpenAI（OpenAI 兼容，base_url=https://api.moonshot.cn/v1）
 
-Extending to a new provider:
-1. Add the provider key and mapping below.
-2. If not OpenAI-compatible, add the appropriate LangChain chat model class.
+扩展新提供商：
+1. 在下方添加提供商键和映射。
+2. 若非 OpenAI 兼容，添加对应的 LangChain 聊天模型类。
 """
 
 from typing import Any
@@ -21,11 +21,11 @@ from typing import Any
 from langchain_core.language_models.chat_models import BaseChatModel
 
 
-# ── Provider → (ChatModel class, default_base_url) ────────────────────
+# ── 提供商 → (ChatModel 类, 默认 base_url) ────────────────────
 
 _PROVIDER_REGISTRY: dict[str, tuple[str, str | None]] = {
     "deepseek":  ("ChatOpenAI", "https://api.deepseek.com/v1"),
-    "openai":    ("ChatOpenAI", None),                       # uses env OPENAI_API_KEY / default base
+    "openai":    ("ChatOpenAI", None),                       # 使用环境变量 OPENAI_API_KEY / 默认 base
     "anthropic": ("ChatAnthropic", None),
     "zhipu":     ("ChatOpenAI", "https://open.bigmodel.cn/api/paas/v4/"),
     "qwen":      ("ChatOpenAI", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
@@ -41,7 +41,7 @@ def _resolve_model_kwargs(
     api_key: str,
     base_url: str | None,
 ) -> dict[str, Any]:
-    """Build kwargs for the LangChain chat model constructor."""
+    """构建 LangChain 聊天模型构造函数的 kwargs。"""
     if provider not in _PROVIDER_REGISTRY:
         raise ValueError(f"Unsupported LLM provider: {provider}. Supported: {SUPPORTED_PROVIDERS}")
 
@@ -51,7 +51,7 @@ def _resolve_model_kwargs(
         "api_key": api_key,
     }
     if cls_name == "ChatOpenAI":
-        # ChatOpenAI uses openai_api_key, not api_key
+        # ChatOpenAI 使用 openai_api_key 而非 api_key
         kwargs = {
             "model": model_name,
             "openai_api_key": api_key,

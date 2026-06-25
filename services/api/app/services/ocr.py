@@ -25,7 +25,7 @@ def recognize_text(
     optional_payload: dict | None = None,
     poll_interval: float = 5,
 ) -> str:
-    """Recognize OCR text from a local file path or URL."""
+    """从本地文件路径或 URL 识别 OCR 文本。"""
     headers = {"Authorization": f"bearer {token or os.getenv('PADDLEOCR_TOKEN', TOKEN)}"}
     payload_options = DEFAULT_OPTIONAL_PAYLOAD if optional_payload is None else optional_payload
 

@@ -4,9 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import require_admin
 from app.models.document import DocumentReviewStatus
 from app.repositories.documents import get_document_by_id, update_document
+from app.schemas.auth import CurrentUser
 from app.schemas.document import DocumentResponse
 from app.services.indexing import index_document
 
@@ -16,9 +17,9 @@ router = APIRouter()
 @router.post("/documents/{document_id}/approve")
 def approve_document(
     document_id: int,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> DocumentResponse:
-    """Approve a document and trigger indexing."""
+    """审批文档并触发索引构建。"""
     doc = get_document_by_id(document_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档未找到")
@@ -27,10 +28,10 @@ def approve_document(
     if updated is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="文档更新失败")
 
-    # Run indexing synchronously
+    # 同步执行索引构建
     index_document(document_id)
 
-    # Re-read to get the latest index_status
+    # 重新读取以获取最新的 index_status
     doc = get_document_by_id(document_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档未找到")
@@ -40,10 +41,10 @@ def approve_document(
 @router.post("/documents/{document_id}/reject")
 def reject_document(
     document_id: int,
-    _admin: Annotated[dict[str, str], Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_admin)],
     reason: Annotated[str | None, Query()] = None,
 ) -> DocumentResponse:
-    """Reject a document with an optional reason."""
+    """驳回文档，可选填写驳回原因。"""
     doc = get_document_by_id(document_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档未找到")

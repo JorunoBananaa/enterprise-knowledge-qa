@@ -14,14 +14,14 @@ class ParsedChunk:
     chunk_index: int
 
 
-# ── Chunking ──────────────────────────────────────────────────────────
+# ── 分块 ──────────────────────────────────────────────────────────
 
 _CHUNK_SIZE = 1000   # characters per chunk
 _CHUNK_OVERLAP = 200
 
 
 def _split_text_into_chunks(text: str, chunk_size: int = _CHUNK_SIZE, overlap: int = _CHUNK_OVERLAP) -> list[str]:
-    """Split text into overlapping chunks, trying to break at sentence boundaries."""
+    """按句子边界将文本切分为有重叠的块。"""
     if not text.strip():
         return []
 
@@ -47,10 +47,10 @@ def _split_text_into_chunks(text: str, chunk_size: int = _CHUNK_SIZE, overlap: i
     return chunks
 
 
-# ── Parsers ───────────────────────────────────────────────────────────
+# ── 解析器 ───────────────────────────────────────────────────────────
 
 def _parse_pdf(path: str) -> list[ParsedChunk]:
-    """Extract text from PDF pages and embedded images."""
+    """从 PDF 页面和嵌入图片中提取文本。"""
     from pypdf import PdfReader
 
     chunks: list[ParsedChunk] = []
@@ -76,13 +76,6 @@ def _parse_pdf(path: str) -> list[ParsedChunk]:
     return chunks
 
 
-def _extract_pdf_image_text(reader) -> list[str]:
-    image_texts: list[str] = []
-    for page_texts in _extract_pdf_image_text_by_page(reader).values():
-        image_texts.extend(page_texts)
-    return image_texts
-
-
 def _extract_pdf_image_text_by_page(reader) -> dict[int, list[str]]:
     image_text_by_page: dict[int, list[str]] = {}
     for page_idx, page in enumerate(reader.pages):
@@ -100,7 +93,7 @@ def _extract_pdf_image_text_by_page(reader) -> dict[int, list[str]]:
 
 
 def _parse_docx(path: str) -> list[ParsedChunk]:
-    """Extract text from DOCX paragraphs and embedded images."""
+    """从 DOCX 段落和嵌入图片中提取文本。"""
     from docx import Document
 
     doc = Document(path)
@@ -134,7 +127,7 @@ def _extract_docx_image_text(doc) -> list[str]:
 
 
 def _parse_pptx(path: str) -> list[ParsedChunk]:
-    """Extract text from PPTX slides and embedded images."""
+    """从 PPTX 幻灯片和嵌入图片中提取文本。"""
     from pptx import Presentation
 
     prs = Presentation(path)
@@ -157,13 +150,6 @@ def _parse_pptx(path: str) -> list[ParsedChunk]:
         ParsedChunk(text=t, locator="PPTX presentation", chunk_index=i)
         for i, t in enumerate(text_chunks)
     ]
-
-
-def _extract_pptx_image_text(prs) -> list[str]:
-    image_texts: list[str] = []
-    for slide_texts in _extract_pptx_image_text_by_slide(prs).values():
-        image_texts.extend(slide_texts)
-    return image_texts
 
 
 def _extract_pptx_image_text_by_slide(prs) -> dict[int, list[str]]:
@@ -211,6 +197,7 @@ def _parse_xlsx(path: str) -> list[ParsedChunk]:
 
 
 def _extract_xlsx_image_text(workbook) -> list[str]:
+    """从 XLSX 工作簿中提取嵌入图片的 OCR 文本。"""
     image_texts: list[str] = []
     for worksheet in workbook.worksheets:
         for image in getattr(worksheet, "_images", []):
@@ -225,6 +212,7 @@ def _extract_xlsx_image_text(workbook) -> list[str]:
 
 
 def _recognize_image_blob(blob: bytes, suffix: str) -> str:
+    """将图片二进制数据写入临时文件并通过 OCR 识别文本。"""
     if not blob:
         return ""
 

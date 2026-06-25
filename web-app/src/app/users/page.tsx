@@ -87,10 +87,13 @@ export default function UsersPage() {
 
   useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearch(value);
-    debouncedSearch(value);
-  }, [debouncedSearch]);
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearch(value);
+      debouncedSearch(value);
+    },
+    [debouncedSearch],
+  );
 
   // ── fetch users ─────────────────────────────────────────────
   const {
@@ -134,14 +137,17 @@ export default function UsersPage() {
   };
 
   // ── edit ──
-  const openEdit = useCallback((user: UserItem) => {
-    setEditUser(user);
-    editForm.setFieldsValue({
-      display_name: user.display_name,
-      role: user.role,
-      status: user.status,
-    });
-  }, [editForm]);
+  const openEdit = useCallback(
+    (user: UserItem) => {
+      setEditUser(user);
+      editForm.setFieldsValue({
+        display_name: user.display_name,
+        role: user.role,
+        status: user.status,
+      });
+    },
+    [editForm],
+  );
 
   const { loading: updating, run: doUpdate } = useApi(
     (id: number) => `/users/${id}`,
@@ -170,10 +176,13 @@ export default function UsersPage() {
   };
 
   // ── reset password ──
-  const openResetPassword = useCallback((user: UserItem) => {
-    setResetPasswordUser(user);
-    pwdForm.resetFields();
-  }, [pwdForm]);
+  const openResetPassword = useCallback(
+    (user: UserItem) => {
+      setResetPasswordUser(user);
+      pwdForm.resetFields();
+    },
+    [pwdForm],
+  );
 
   const { loading: resetting, run: doResetPassword } = useApi(
     (id: number) => `/users/${id}/reset-password`,
@@ -217,11 +226,14 @@ export default function UsersPage() {
     },
   });
 
-  const handleToggleDisable = useCallback((user: UserItem) => {
-    const newStatus = user.status === "active" ? "disabled" : "active";
-    setTogglingId(user.id);
-    toggleDisable(user.id, { status: newStatus });
-  }, [toggleDisable]);
+  const handleToggleDisable = useCallback(
+    (user: UserItem) => {
+      const newStatus = user.status === "active" ? "disabled" : "active";
+      setTogglingId(user.id);
+      toggleDisable(user.id, { status: newStatus });
+    },
+    [toggleDisable],
+  );
 
   const columns = useMemo(
     () => [
@@ -376,7 +388,7 @@ export default function UsersPage() {
         }}
       />
 
-      {/* Create Modal */}
+      {/* 新建用户弹窗 */}
       <Modal
         title="新建用户"
         open={createOpen}
@@ -427,7 +439,7 @@ export default function UsersPage() {
         </Form>
       </Modal>
 
-      {/* Edit Modal */}
+      {/* 编辑用户弹窗 */}
       <Modal
         title="编辑用户"
         open={!!editUser}
@@ -460,7 +472,7 @@ export default function UsersPage() {
         </Form>
       </Modal>
 
-      {/* Reset Password Modal */}
+      {/* 重置密码弹窗 */}
       <Modal
         title={`重置密码 — ${resetPasswordUser?.display_name || ""}`}
         open={!!resetPasswordUser}

@@ -34,6 +34,7 @@ from app.services.chat_branching import (
     fork_chat_session_at_message,
 )
 from app.services.chat_persistence import (
+    _first_line,
     persist_new_chat_session,
     persist_streamed_chat_message,
     update_session_title_for_first_question,
@@ -60,16 +61,11 @@ class AskCancelState:
 _ASK_CANCEL_STATES: dict[str, AskCancelState] = {}
 
 
-# ── Helpers ───────────────────────────────────────────────────────────
-
-def _first_line(text: str, max_len: int = 60) -> str:
-    """Extract first line of text as a title fallback."""
-    line = text.split("\n")[0].strip()
-    return line[:max_len] + ("…" if len(line) > max_len else "")
+# ── 工具函数 ───────────────────────────────────────────────────────────
 
 
 def format_sse(event_type: str, data: dict | str | None = None) -> str:
-    """Format a Server-Sent Event string."""
+    """格式化 Server-Sent Event 字符串。"""
     if data is None:
         data = {}
     payload = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data

@@ -2,7 +2,6 @@ import { Tag } from "antd";
 
 interface Props {
   status: string;
-  type: "review" | "index";
 }
 
 const CONFIG: Record<string, { label: string; color: string }> = {

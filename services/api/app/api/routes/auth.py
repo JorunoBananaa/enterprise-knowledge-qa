@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import _user_to_current_user, get_current_user, get_db
 from app.core.security import (
     clear_auth_cookie,
     create_access_token,
@@ -22,16 +22,6 @@ from app.schemas.auth import (
 router = APIRouter()
 
 
-def _to_current_user(user) -> CurrentUser:
-    return CurrentUser(
-        id=user.id,
-        username=user.username,
-        display_name=user.display_name,
-        role=user.role.value if hasattr(user.role, "value") else user.role,
-        status=user.status.value if hasattr(user.status, "value") else user.status,
-    )
-
-
 @router.post("/login", response_model=LoginResponse)
 def login(
     payload: LoginRequest,
@@ -46,7 +36,7 @@ def login(
 
     token = create_access_token(user)
     set_auth_cookie(response, token)
-    return LoginResponse(user=_to_current_user(user))
+    return LoginResponse(user=_user_to_current_user(user))
 
 
 @router.post("/logout", response_model=MessageResponse)

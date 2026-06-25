@@ -14,7 +14,7 @@ import PromptPanel from "@/components/PromptPanel";
 export default function PromptsPage() {
   const { data: user = null, loading } = useRequest(getCurrentUser, {
     onError: () => {
-      // AppShell owns the global unauthenticated redirect.
+      // AppShell 负责全局的未认证重定向。
     },
   });
   const isAdmin = user?.role === "admin";

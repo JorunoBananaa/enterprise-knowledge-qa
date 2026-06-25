@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def _get_embedding_model():
-    """Resolve an embedding model.
+    """解析 embedding 模型。
 
-    For remote providers (openai, zhipu, etc.): reuses the active LLM config's
-    API key / base URL, but uses the embedding_model_name from settings.
+    对远程提供商（openai、zhipu 等）：复用活跃 LLM 配置的
+    API key / base URL，但使用 settings 中的 embedding_model_name。
 
-    For local providers (huggingface): no LLM config needed – runs entirely
-    offline with models auto-downloaded from HuggingFace Hub.
+    对本地提供商（huggingface）：无需 LLM 配置 —— 完全离线运行，
+    模型从 HuggingFace Hub 自动下载。
     """
     provider = settings.embedding_provider
 
@@ -29,10 +29,10 @@ def _get_embedding_model():
             model_name=settings.embedding_model_name,
         )
 
-    # Remote providers need an active LLM config for the API key
+    # 远程提供商需要活跃的 LLM 配置来获取 API key
     active_cfg = get_active_llm_config()
     if active_cfg is None:
-        raise RuntimeError("No active LLM config found – cannot generate embeddings")
+        raise RuntimeError("未找到活跃的 LLM 配置 —— 无法生成 embeddings")
 
     return create_embeddings(
         provider=active_cfg.provider,
@@ -43,14 +43,14 @@ def _get_embedding_model():
 
 
 def index_document(document_id: int) -> None:
-    """Parse an approved document, generate embeddings, store chunks in pgvector.
+    """解析已通过的文档，生成 embeddings，将块存入 pgvector。
 
-    Steps:
-    1. Mark document as INDEXING
-    2. Parse the file into text chunks
-    3. Generate vector embeddings for each chunk
-    4. Store chunks + embeddings in document_chunks table
-    5. Mark document as INDEXED (or FAILED on error)
+    步骤：
+    1. 标记文档为 INDEXING
+    2. 将文件解析为文本块
+    3. 为每个块生成向量 embeddings
+    4. 将块 + embeddings 存入 document_chunks 表
+    5. 标记文档为 INDEXED（失败则标记为 FAILED）
     """
     document = get_document_by_id(document_id)
     if document is None:
@@ -58,30 +58,30 @@ def index_document(document_id: int) -> None:
 
     db = SessionLocal()
     try:
-        # 1. Mark as indexing
+        # 1. 标记为索引中
         update_document(document_id, index_status=DocumentIndexStatus.INDEXING.value)
 
-        # 2. Parse the document into text chunks
+        # 2. 将文档解析为文本块
         chunks = parse_document(document.storage_path, document.file_type)
         if not chunks:
             update_document(
                 document_id,
                 index_status=DocumentIndexStatus.FAILED.value,
-                failure_reason="No parseable content found",
+                failure_reason="无可解析内容",
             )
             return
 
-        # 3. Generate embeddings
+        # 3. 生成 embeddings
         embed_model = _get_embedding_model()
         texts = [chunk.text for chunk in chunks]
         embeddings = embed_model.embed_documents(texts)
 
-        # 4. Delete old chunks for this document (re-index scenario)
+        # 4. 删除该文档的旧块（重新索引场景）
         db.query(DocumentChunk).filter(
             DocumentChunk.document_id == document_id
         ).delete()
 
-        # 5. Store chunks with embeddings
+        # 5. 存储块及其 embeddings
         for chunk, embedding in zip(chunks, embeddings):
             db.add(DocumentChunk(
                 document_id=document_id,
@@ -93,7 +93,7 @@ def index_document(document_id: int) -> None:
 
         db.commit()
 
-        # 6. Mark as indexed
+        # 6. 标记为已索引
         update_document(document_id, index_status=DocumentIndexStatus.INDEXED.value)
 
     except Exception as e:

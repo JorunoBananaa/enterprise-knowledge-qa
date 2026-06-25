@@ -23,7 +23,7 @@ INSUFFICIENT_EVIDENCE_ANSWER = "知识库中没有找到足够的信息来回答
 def _build_citations(
     retrieved_chunks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Build citation list from retrieved chunks."""
+    """从检索到的文档块构建引用列表。"""
     return [
         {
             "document_id": chunk["document_id"],
@@ -45,7 +45,7 @@ def _build_citations(
 def _history_to_messages(
     chat_history: list[dict[str, str]] | None = None,
 ) -> list[BaseMessage]:
-    """Convert stored session turns into LangChain chat messages."""
+    """将存储的会话轮次转换为 LangChain 聊天消息。"""
     messages: list[BaseMessage] = []
     for turn in chat_history or []:
         previous_question = (turn.get("question") or "").strip()
@@ -64,7 +64,7 @@ def _build_answer_prompt_input(
     user_prompt: str | None,
     chat_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Build input variables for the grounded answer prompt."""
+    """构建带引用答案 prompt 的输入变量。"""
     return {
         "system_content": compose_system_message_content(system_prompt),
         "history": _history_to_messages(chat_history),
@@ -77,7 +77,7 @@ def _build_answer_prompt_input(
 
 
 def _clean_rewritten_question(raw_question: str, fallback_question: str) -> str:
-    """Normalize the LLM-produced retrieval question."""
+    """规范化 LLM 生成的检索改写问题。"""
     question = raw_question.strip()
     if question.startswith("```") and question.endswith("```"):
         question = question.strip("`").strip()
@@ -96,7 +96,7 @@ async def rewrite_question_for_retrieval(
     chat_history: list[dict[str, str]] | None,
     llm: BaseChatModel,
 ) -> str:
-    """Rewrite follow-up questions into standalone retrieval queries."""
+    """将多轮对话中的追问改写为独立的检索查询。"""
     history_messages = _history_to_messages(chat_history)
     if not history_messages:
         return question
@@ -111,7 +111,7 @@ async def rewrite_question_for_retrieval(
         )
         return _clean_rewritten_question(rewritten_question, question)
     except Exception:
-        logger.exception("Question rewrite failed; using original question")
+        logger.exception("问题改写失败；使用原始问题")
         return question
 
 
@@ -123,9 +123,9 @@ async def answer_question_stream(
     llm: BaseChatModel,
     chat_history: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
-    """Answer a question using retrieved chunks (streaming).
+    """使用检索到的文档块流式回答问题。
 
-    Yields SSE-style event dicts:
+    生成 SSE 风格的事件字典：
         {"type": "chunk", "text": "..."}
         {"type": "citation", ...}
         {"type": "done", "status": "answered"}
@@ -153,11 +153,11 @@ async def answer_question_stream(
             if text:
                 yield {"type": "chunk", "text": str(text)}
 
-        # Yield citations after tokens so frontend can render them last
+        # 在 token 之后产出引用，使前端能在最后渲染它们
         for c in citations:
             yield {"type": "citation", **c}
 
         yield {"type": "done", "status": "answered"}
     except Exception as exc:
-        logger.exception("LLM streaming failed")
+        logger.exception("LLM 流式调用失败")
         yield {"type": "error", "message": f"LLM 调用失败: {exc}"}

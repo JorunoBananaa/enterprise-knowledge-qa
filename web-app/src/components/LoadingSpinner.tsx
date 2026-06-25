@@ -1,7 +1,7 @@
 import { Spin } from "antd";
 
 interface LoadingSpinnerProps {
-  /** Extra classes on the wrapper div. Defaults to py-20. */
+  /** 外层 div 上的额外类名。默认为 py-20。 */
   className?: string;
 }
 

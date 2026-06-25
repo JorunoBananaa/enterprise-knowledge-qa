@@ -28,7 +28,7 @@ class LLMConfigResponse(BaseModel):
     name: str
     provider: str
     model_name: str
-    api_key: str  # masked in response
+    api_key: str  # 响应中已脱敏
     base_url: str | None
     is_active: bool
     created_at: datetime
@@ -36,7 +36,7 @@ class LLMConfigResponse(BaseModel):
 
     @classmethod
     def from_orm_obj(cls, obj: Any) -> "LLMConfigResponse":
-        # Mask API key – show only last 4 chars
+        # 脱敏 API key —— 仅显示最后 4 位
         key = obj.api_key or ""
         masked = "****" + key[-4:] if len(key) > 4 else "****"
         return cls(
@@ -53,7 +53,7 @@ class LLMConfigResponse(BaseModel):
 
 
 class LLMConfigBrief(BaseModel):
-    """Lightweight option for dropdown selection."""
+    """下拉选择的轻量选项。"""
     id: int
     name: str
     provider: str
