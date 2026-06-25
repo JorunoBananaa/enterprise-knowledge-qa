@@ -10,7 +10,6 @@ const MARKDOWN_CONFIG: XMarkdownProps["config"] = {
 const MARKDOWN_STREAMING: XMarkdownProps["streaming"] = {
   hasNextChunk: true,
   enableAnimation: true,
-  tail: true,
 };
 
 const MARKDOWN_DONE: XMarkdownProps["streaming"] = {
