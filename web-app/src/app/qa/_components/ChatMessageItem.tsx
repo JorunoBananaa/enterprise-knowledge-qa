@@ -60,6 +60,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
   onSelectSource,
 }: ChatMessageItemProps) {
   const hasAnswer = msg.answer.trim().length > 0;
+  const isStreamingAnswer = msg.result_status === "streaming";
   const renderAssistantAnswer = shouldRenderAssistantAnswer(msg);
   const canFork = canForkChatMessage(msg);
   const actionStyles = {
@@ -194,7 +195,10 @@ const ChatMessageItem = memo(function ChatMessageItem({
                   borderRadius: answerBorderRadius,
                 }}
               >
-                <MarkdownAnswer content={msg.answer} />
+                <MarkdownAnswer
+                  content={msg.answer}
+                  streaming={isStreamingAnswer}
+                />
               </Card>
               <div className="mt-1 flex min-h-7 items-start justify-between gap-3">
                 <SourceChips
