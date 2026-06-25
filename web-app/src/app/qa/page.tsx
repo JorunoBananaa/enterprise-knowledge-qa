@@ -19,6 +19,7 @@ import {
   message,
   theme,
 } from "antd";
+import { isNull } from "lodash";
 import { FilterOutlined, RobotOutlined } from "@ant-design/icons";
 import { Sender, SenderProps } from "@ant-design/x";
 import { useXChat, type MessageInfo } from "@ant-design/x-sdk";
@@ -59,7 +60,10 @@ interface ForkSessionResponse {
 }
 
 function createRequestId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
 
@@ -69,6 +73,13 @@ function createRequestId(): string {
 // ── component ────────────────────────────────────────────────────────
 
 export default function QAPage() {
+  const searchParams = useSearchParams();
+  const sessionIdParam = searchParams.get("session_id");
+
+  if (isNull(sessionIdParam)) {
+    return null;
+  }
+
   return (
     <Suspense
       fallback={
@@ -79,16 +90,14 @@ export default function QAPage() {
         </div>
       }
     >
-      <QAPageContent />
+      <QAPageContent sessionIdParam={sessionIdParam} />
     </Suspense>
   );
 }
 
-function QAPageContent() {
+function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   const { token } = theme.useToken();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionIdParam = searchParams.get("session_id");
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const [forkingMessageId, setForkingMessageId] = useState<number | null>(null);
@@ -406,13 +415,19 @@ function QAPageContent() {
     setEditQuestion("");
   }, []);
   // 内联编辑发送框提交：将 editQuestion 值和编辑消息 ID 传入 handleAsk
-  const handleInlineEditSubmit: SenderProps["onSubmit"] = useCallback(
-    (val) => {
+  const handleInlineEditSubmit = useCallback(
+    (val?: string) => {
       const q = (typeof val === "string" ? val : editQuestion).trim();
       if (!q) return;
       handleAsk(q, editingMessageId);
     },
     [editQuestion, editingMessageId, handleAsk],
+  );
+  const handleSubmitQuestion: SenderProps["onSubmit"] = useCallback(
+    (msg: string) => {
+      handleAsk(msg);
+    },
+    [handleAsk],
   );
   const handleForkAnswer = useCallback(
     async (msg: ChatMessageOut) => {
@@ -559,7 +574,9 @@ function QAPageContent() {
                       onForkAnswer={handleForkAnswer}
                       forking={forkingMessageId === msg.id}
                       onSelectSource={handleSelectSource}
-                      lastIndex={index === normalizedChatMessageInfos.length - 1}
+                      lastIndex={
+                        index === normalizedChatMessageInfos.length - 1
+                      }
                       editing={editingMessageId === msg.id}
                       editValue={editQuestion}
                       onEditChange={setEditQuestion}
@@ -596,7 +613,7 @@ function QAPageContent() {
             <Sender
               value={question}
               onChange={setQuestion}
-              onSubmit={handleAsk}
+              onSubmit={handleSubmitQuestion}
               loading={isRequesting}
               onCancel={handleCancel}
               placeholder="向知识库提问，例如：报销标准是多少？"

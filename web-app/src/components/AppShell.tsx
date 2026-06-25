@@ -10,15 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  App,
-  Button,
-  Layout,
-  Popconfirm,
-  Spin,
-  Typography,
-  message,
-} from "antd";
+import { App, Button, Layout, Modal, Spin, Typography, message } from "antd";
 import {
   AuditOutlined,
   BookOutlined,
@@ -29,13 +21,12 @@ import {
   QuestionCircleOutlined,
   RobotOutlined,
   TeamOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
+import { Conversations, type ConversationItemType } from "@ant-design/x";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
 import { pushCurrentSessionUrl } from "@/app/qa/_lib/session-url";
-import type { CurrentUser } from "@/lib/auth-client";
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -86,6 +77,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ready: Boolean(user),
     refreshDeps: [Boolean(user)],
   });
+
+  // ── create session ──
+  const { loading: creatingSession, run: createQaSession } = useApi<
+    SessionItem,
+    [],
+    "POST"
+  >("/qa/sessions", {
+    method: "POST",
+    manual: true,
+    onSuccess: (session) => {
+      loadQaSessions();
+      window.dispatchEvent(new Event("qa:sessions-updated"));
+      router.push(`/qa?session_id=${session.id}`);
+    },
+    onError: () => {
+      message.error("创建会话失败");
+    },
+  });
+  const handleCreateQaSession = useCallback(() => {
+    createQaSession();
+  }, [createQaSession]);
 
   // ── delete session ──
   const { run: handleDeleteSession } = useApi(
@@ -242,13 +254,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          <Link
-            href="/qa"
-            className="flex items-center gap-[9px] h-7 mt-[18px] mb-4 rounded-md bg-app-primary px-3 text-white text-sm font-bold cursor-pointer transition-colors duration-200 ease-out hover:bg-[#262626] hover:text-white"
+          <Button
+            type="primary"
+            icon={<PlusSquareOutlined />}
+            onClick={handleCreateQaSession}
+            loading={creatingSession}
+            className="!flex !items-center !justify-start !gap-[9px] !h-7 !w-full !mt-[18px] !mb-4 !rounded-md !bg-app-primary !px-3 !text-sm !font-bold !shadow-none hover:!bg-[#262626]"
           >
-            <PlusSquareOutlined />
-            <span>新建问答</span>
-          </Link>
+            新建回答
+          </Button>
 
           <nav className="grid gap-0.5 mb-[22px]" aria-label="主导航">
             {navItems.map((item) => {
@@ -333,6 +347,7 @@ interface SessionHistoryBlockProps {
 
 function SessionHistoryBlock({
   sessions,
+  loading,
   onDeleteSession,
   onCurrentSessionIdChange,
 }: SessionHistoryBlockProps) {
@@ -340,8 +355,20 @@ function SessionHistoryBlock({
   const pathname = usePathname();
   const router = useRouter();
   const currentSessionId = searchParams.get("session_id");
+  const conversationItems = useMemo<ConversationItemType[]>(
+    () =>
+      sessions.map((session) => ({
+        key: String(session.id),
+        label: session.title || "新会话",
+      })),
+    [sessions],
+  );
+
   const handleOpenSession = useCallback(
-    (sessionId: number) => {
+    (sessionKey: string) => {
+      const sessionId = Number(sessionKey);
+      if (!Number.isFinite(sessionId)) return;
+
       if (pathname === "/qa") {
         pushCurrentSessionUrl(sessionId);
         return;
@@ -351,60 +378,67 @@ function SessionHistoryBlock({
     },
     [pathname, router],
   );
+  const handleDeleteConversation = useCallback(
+    (conversation: ConversationItemType) => {
+      const sessionId = Number(conversation.key);
+      if (!Number.isFinite(sessionId)) return;
+
+      Modal.confirm({
+        title: "确定删除此会话？",
+        content: "删除后不可恢复",
+        okText: "删除",
+        cancelText: "取消",
+        okButtonProps: { danger: true },
+        onOk: () => onDeleteSession(sessionId),
+      });
+    },
+    [onDeleteSession],
+  );
 
   // Keep the parent in sync so the delete callback can check the current id
   useEffect(() => {
     onCurrentSessionIdChange(currentSessionId);
   }, [currentSessionId, onCurrentSessionIdChange]);
 
-  if (sessions.length === 0) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center px-2 py-3">
+        <Spin size="small" />
+      </div>
+    );
+  }
+
+  if (conversationItems.length === 0) {
     return (
       <div className="px-2 py-2.5 text-app-muted text-[13px]">暂无历史会话</div>
     );
   }
 
   return (
-    <div className="grid gap-1 max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5">
-      {sessions.map((session) => {
-        const active = currentSessionId === String(session.id);
-        return (
-          <div
-            key={session.id}
-            className={`group flex items-center gap-1 min-w-0 min-h-[38px] rounded-lg py-1.5 pl-[11px] pr-[5px] text-app-text cursor-pointer transition-colors duration-200 ease-out hover:bg-[#efeff0] ${
-              active ? "bg-[#efeff0]" : ""
-            }`}
-          >
-            <div
-              onClick={() => handleOpenSession(session.id)}
-              className="flex-1 min-w-0 text-inherit cursor-pointer"
-            >
-              <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold">
-                {session.title || "新会话"}
-              </span>
-            </div>
-            <Popconfirm
-              title="确定删除此会话？"
-              description="删除后不可恢复"
-              onConfirm={() => onDeleteSession(session.id)}
-              onCancel={(e) => {
-                (e as React.MouseEvent).stopPropagation();
-              }}
-              okText="删除"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-            >
-              <button
-                type="button"
-                className="invisible opacity-0 inline-flex items-center justify-center shrink-0 w-7 h-7 border-0 rounded-md bg-transparent text-app-muted cursor-pointer p-0 transition-[opacity,visibility] duration-150 hover:bg-black/5 hover:text-app-danger group-hover:visible group-hover:opacity-100"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="删除会话"
-              >
-                <DeleteOutlined />
-              </button>
-            </Popconfirm>
-          </div>
-        );
+    <Conversations
+      items={conversationItems}
+      activeKey={currentSessionId ?? undefined}
+      onActiveChange={handleOpenSession}
+      className="max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
+      classNames={{
+        item: "!min-h-[38px] !rounded-lg !px-[11px] !py-1.5 !text-[13px] !font-bold",
+      }}
+      menu={(conversation) => ({
+        items: [
+          {
+            key: "delete",
+            label: "删除",
+            icon: <DeleteOutlined />,
+            danger: true,
+          },
+        ],
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          if (key === "delete") {
+            handleDeleteConversation(conversation);
+          }
+        },
       })}
-    </div>
+    />
   );
 }

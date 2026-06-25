@@ -421,6 +421,25 @@ def list_sessions(
     return out
 
 
+@router.post("/sessions", response_model=ChatSessionOut)
+def create_session(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ChatSessionOut:
+    """Create an empty chat session for starting a new conversation."""
+    session = persist_new_chat_session(
+        db,
+        user_id=str(current_user.id),
+        title="新会话",
+    )
+    return ChatSessionOut(
+        id=session.id,
+        title=session.title,
+        created_at=session.created_at,
+        message_count=0,
+    )
+
+
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
 def get_session(
     session_id: int,
