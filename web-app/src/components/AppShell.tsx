@@ -133,8 +133,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   });
   const handleCreateQaSession = useCallback(() => {
+    // 已存在未使用的"新会话"（标题为"新会话"且无消息）时直接跳转，不再新建
+    const existingNewSession = qaSessions.find(
+      (s) => (s.title || "新会话") === "新会话" && s.message_count === 0,
+    );
+    if (existingNewSession) {
+      setActiveConversationKey(String(existingNewSession.id));
+      router.push(`/qa?session_id=${existingNewSession.id}`);
+      return;
+    }
     createQaSession();
-  }, [createQaSession]);
+  }, [createQaSession, qaSessions, router, setActiveConversationKey]);
 
   // ── delete session ──
   const { run: handleDeleteSession } = useApi(
