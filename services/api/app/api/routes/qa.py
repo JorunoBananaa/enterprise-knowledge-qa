@@ -319,10 +319,14 @@ def _compute_query_embedding(question: str) -> list[float]:
     """Compute the query embedding (synchronous, may load model weights)."""
     provider = settings.embedding_provider
 
-    if provider == "huggingface":
+    if provider in ("huggingface", "ollama"):
+        kwargs: dict[str, str] = {}
+        if provider == "ollama":
+            kwargs["base_url"] = settings.ollama_base_url
         embed_model = create_embeddings(
-            provider="huggingface",
+            provider=provider,
             model_name=settings.embedding_model_name,
+            **kwargs,
         )
     else:
         # Remote providers need an active LLM config for the API key

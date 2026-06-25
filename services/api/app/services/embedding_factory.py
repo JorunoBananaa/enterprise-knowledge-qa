@@ -7,12 +7,29 @@ Supported providers:
 - zhipu       → OpenAIEmbeddings (OpenAI-compatible, base_url=https://open.bigmodel.cn/api/paas/v4/)
 - qwen        → OpenAIEmbeddings (OpenAI-compatible, via DashScope)
 - huggingface → HuggingFaceEmbeddings (local, no API key needed)
+- ollama      → OpenAIEmbeddings (OpenAI-compatible, local Ollama, base_url=http://localhost:11434/v1)
 """
 
 import threading
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
+
+
+class _OllamaEmbeddings(OpenAIEmbeddings):
+    """OpenAIEmbeddings wrapper for Ollama's single-string /v1/embeddings.
+
+    Ollama only accepts ``{"input": "a single string"}`` — the standard
+    OpenAIEmbeddings.embed_documents() sends a JSON array, which fails
+    with "invalid input type".  This subclass sends one request per text.
+    """
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [
+            self.client.create(input=t, model=self.model).data[0].embedding
+            for t in texts
+        ]
 
 # ── Provider → (Embeddings class, default_base_url) ──────────────────
 
@@ -22,6 +39,7 @@ _EMBEDDING_REGISTRY: dict[str, tuple[str, str | None]] = {
     "zhipu":       ("OpenAIEmbeddings", "https://open.bigmodel.cn/api/paas/v4/"),
     "qwen":        ("OpenAIEmbeddings", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     "huggingface": ("HuggingFaceEmbeddings", None),
+    "ollama":      ("OpenAIEmbeddings", "http://localhost:11434/v1"),
 }
 
 SUPPORTED_EMBEDDING_PROVIDERS = sorted(_EMBEDDING_REGISTRY.keys())
@@ -48,14 +66,22 @@ def _instantiate_embeddings(
     resolved_base = base_url or default_base
 
     if cls_name == "OpenAIEmbeddings":
-        from langchain_openai import OpenAIEmbeddings
+        # Ollama runs locally and does not require an API key, but the
+        # OpenAI client rejects an empty string.  Provide a dummy value.
+        resolved_api_key = api_key or ("ollama" if provider == "ollama" else "")
 
         kwargs: dict[str, Any] = {
             "model": model_name,
-            "openai_api_key": api_key,
+            "openai_api_key": resolved_api_key,
         }
         if resolved_base:
             kwargs["base_url"] = resolved_base
+
+        # Ollama /v1/embeddings only accepts single-string input.
+        # _OllamaEmbeddings overrides embed_documents() to batch one-by-one.
+        if provider == "ollama":
+            return _OllamaEmbeddings(**kwargs)
+
         return OpenAIEmbeddings(**kwargs)
 
     if cls_name == "HuggingFaceEmbeddings":

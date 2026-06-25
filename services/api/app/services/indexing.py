@@ -18,15 +18,18 @@ def _get_embedding_model():
     对远程提供商（openai、zhipu 等）：复用活跃 LLM 配置的
     API key / base URL，但使用 settings 中的 embedding_model_name。
 
-    对本地提供商（huggingface）：无需 LLM 配置 —— 完全离线运行，
-    模型从 HuggingFace Hub 自动下载。
+    对本地提供商（huggingface、ollama）：无需 LLM 配置 —— 完全本地运行。
     """
     provider = settings.embedding_provider
 
-    if provider == "huggingface":
+    if provider in ("huggingface", "ollama"):
+        kwargs: dict[str, str] = {}
+        if provider == "ollama":
+            kwargs["base_url"] = settings.ollama_base_url
         return create_embeddings(
-            provider="huggingface",
+            provider=provider,
             model_name=settings.embedding_model_name,
+            **kwargs,
         )
 
     # 远程提供商需要活跃的 LLM 配置来获取 API key
