@@ -23,6 +23,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { Conversations, type ConversationItemType } from "@ant-design/x";
+import { useXConversations, type ConversationData } from "@ant-design/x-sdk";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
@@ -38,9 +39,43 @@ interface SessionItem {
   message_count: number;
 }
 
+type QAConversationItem = ConversationData & ConversationItemType;
+
+const EMPTY_QA_SESSIONS: SessionItem[] = [];
+
+function toConversationItem(session: SessionItem): QAConversationItem {
+  return {
+    key: String(session.id),
+    label: session.title || "新会话",
+  };
+}
+
+function areConversationItemsEqual(
+  current: QAConversationItem[],
+  next: QAConversationItem[],
+): boolean {
+  if (current.length !== next.length) return false;
+
+  return current.every(
+    (item, index) =>
+      item.key === next[index].key && item.label === next[index].label,
+  );
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    conversations: qaConversations,
+    activeConversationKey,
+    setActiveConversationKey,
+    addConversation,
+    removeConversation,
+    setConversations,
+  } = useXConversations({
+    defaultConversations: [],
+    defaultActiveConversationKey: "",
+  });
 
   // Track whether the initial user fetch has completed.
   // We must NOT replace the whole component tree with a spinner on
@@ -70,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // ── qa sessions ──
   const {
-    data: qaSessions = [],
+    data: qaSessions = EMPTY_QA_SESSIONS,
     loading: sessionsLoading,
     run: loadQaSessions,
   } = useApi<SessionItem[]>("/qa/sessions", {
@@ -87,6 +122,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     method: "POST",
     manual: true,
     onSuccess: (session) => {
+      addConversation(toConversationItem(session), "prepend");
+      setActiveConversationKey(String(session.id));
       loadQaSessions();
       window.dispatchEvent(new Event("qa:sessions-updated"));
       router.push(`/qa?session_id=${session.id}`);
@@ -108,7 +145,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       onSuccess: (_data, params) => {
         const [id] = params;
         message.success("会话已删除");
+        removeConversation(String(id));
         if (currentSessionIdRef.current === String(id)) {
+          setActiveConversationKey("");
           router.push("/qa");
         }
         loadQaSessions();
@@ -177,6 +216,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("qa:sessions-updated", loadQaSessions);
     };
   }, [loadQaSessions]);
+
+  useEffect(() => {
+    const nextConversations = qaSessions.map(toConversationItem);
+    if (
+      areConversationItemsEqual(
+        qaConversations as QAConversationItem[],
+        nextConversations,
+      )
+    ) {
+      return;
+    }
+
+    setConversations(nextConversations);
+  }, [qaConversations, qaSessions, setConversations]);
 
   const navItems = useMemo(() => {
     const items = [
@@ -288,8 +341,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span>历史会话</span>
             </div>
             <SessionHistoryBlock
-              sessions={qaSessions}
+              conversations={qaConversations as QAConversationItem[]}
+              activeConversationKey={activeConversationKey}
               loading={sessionsLoading}
+              onActiveConversationKeyChange={setActiveConversationKey}
               onDeleteSession={handleDeleteSession}
               onCurrentSessionIdChange={handleCurrentSessionIdChange}
             />
@@ -339,15 +394,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 // route changes don't trigger the outer layout Suspense / full-page reload.
 
 interface SessionHistoryBlockProps {
-  sessions: SessionItem[];
+  conversations: QAConversationItem[];
+  activeConversationKey: string;
   loading: boolean;
+  onActiveConversationKeyChange: (key: string) => boolean;
   onDeleteSession: (id: number) => void;
   onCurrentSessionIdChange: (id: string | null) => void;
 }
 
 function SessionHistoryBlock({
-  sessions,
+  conversations,
+  activeConversationKey,
   loading,
+  onActiveConversationKeyChange,
   onDeleteSession,
   onCurrentSessionIdChange,
 }: SessionHistoryBlockProps) {
@@ -355,20 +414,15 @@ function SessionHistoryBlock({
   const pathname = usePathname();
   const router = useRouter();
   const currentSessionId = searchParams.get("session_id");
-  const conversationItems = useMemo<ConversationItemType[]>(
-    () =>
-      sessions.map((session) => ({
-        key: String(session.id),
-        label: session.title || "新会话",
-      })),
-    [sessions],
-  );
 
   const handleOpenSession = useCallback(
     (sessionKey: string) => {
       const sessionId = Number(sessionKey);
       if (!Number.isFinite(sessionId)) return;
 
+      if (activeConversationKey !== sessionKey) {
+        onActiveConversationKeyChange(sessionKey);
+      }
       if (pathname === "/qa") {
         pushCurrentSessionUrl(sessionId);
         return;
@@ -376,7 +430,12 @@ function SessionHistoryBlock({
 
       router.push(`/qa?session_id=${sessionId}`);
     },
-    [pathname, router],
+    [
+      activeConversationKey,
+      onActiveConversationKeyChange,
+      pathname,
+      router,
+    ],
   );
   const handleDeleteConversation = useCallback(
     (conversation: ConversationItemType) => {
@@ -398,7 +457,17 @@ function SessionHistoryBlock({
   // Keep the parent in sync so the delete callback can check the current id
   useEffect(() => {
     onCurrentSessionIdChange(currentSessionId);
-  }, [currentSessionId, onCurrentSessionIdChange]);
+
+    const nextActiveKey = currentSessionId ?? "";
+    if (activeConversationKey !== nextActiveKey) {
+      onActiveConversationKeyChange(nextActiveKey);
+    }
+  }, [
+    activeConversationKey,
+    currentSessionId,
+    onActiveConversationKeyChange,
+    onCurrentSessionIdChange,
+  ]);
 
   if (loading) {
     return (
@@ -408,7 +477,7 @@ function SessionHistoryBlock({
     );
   }
 
-  if (conversationItems.length === 0) {
+  if (conversations.length === 0) {
     return (
       <div className="px-2 py-2.5 text-app-muted text-[13px]">暂无历史会话</div>
     );
@@ -416,8 +485,8 @@ function SessionHistoryBlock({
 
   return (
     <Conversations
-      items={conversationItems}
-      activeKey={currentSessionId ?? undefined}
+      items={conversations}
+      activeKey={activeConversationKey || undefined}
       onActiveChange={handleOpenSession}
       className="max-h-[calc(100vh-354px)] overflow-hidden overflow-y-auto pr-0.5"
       classNames={{

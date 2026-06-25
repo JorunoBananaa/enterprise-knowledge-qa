@@ -50,13 +50,35 @@ import { replaceCurrentSessionUrl } from "./_lib/session-url";
 import {
   createPendingQAChatMessage,
   createQAChatProvider,
+  type QAChatProvider,
   type QAAskInput,
 } from "./_lib/qa-chat-provider";
 
 const { Text } = Typography;
+const DRAFT_CONVERSATION_KEY = "qa-draft";
+const providerCache = new Map<string, QAChatProvider>();
 
 interface ForkSessionResponse {
   session_id: number;
+}
+
+function getSessionConversationKey(sessionId: number | null): string {
+  return sessionId == null ? DRAFT_CONVERSATION_KEY : `qa-session-${sessionId}`;
+}
+
+function getSessionIdFromConversationKey(conversationKey?: string): number | null {
+  if (!conversationKey?.startsWith("qa-session-")) return null;
+
+  const sessionId = Number(conversationKey.slice("qa-session-".length));
+  return Number.isFinite(sessionId) ? sessionId : null;
+}
+
+function getQAChatProvider(conversationKey: string): QAChatProvider {
+  if (!providerCache.has(conversationKey)) {
+    providerCache.set(conversationKey, createQAChatProvider());
+  }
+
+  return providerCache.get(conversationKey)!;
 }
 
 function createRequestId(): string {
@@ -98,6 +120,19 @@ export default function QAPage() {
 function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   const { token } = theme.useToken();
   const router = useRouter();
+  const routeSessionId = useMemo(() => {
+    const sessionId = Number(sessionIdParam);
+    return Number.isFinite(sessionId) ? sessionId : null;
+  }, [sessionIdParam]);
+  const routeConversationKey = useMemo(
+    () => getSessionConversationKey(routeSessionId),
+    [routeSessionId],
+  );
+  const [conversationAliases, setConversationAliases] = useState<
+    Record<string, string>
+  >({});
+  const conversationKey =
+    conversationAliases[routeConversationKey] ?? routeConversationKey;
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const [forkingMessageId, setForkingMessageId] = useState<number | null>(null);
@@ -110,7 +145,10 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   const [sourceDetail, setSourceDetail] = useState<SourceSummary | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const localSessionUrlSyncRef = useRef<number | null>(null);
-  const activeRequestIdRef = useRef<string | null>(null);
+  const requestIdByConversationRef = useRef(new Map<string, string>());
+  const refreshAfterRequestByConversationRef = useRef(
+    new Map<string, boolean>(),
+  );
 
   // ── scope selection ──
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -125,7 +163,10 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   const scopeLabel = scopeTotal === 0 ? "全部知识库" : `已选 ${scopeTotal} 项`;
 
   // ── chat provider ──
-  const [provider] = useState(createQAChatProvider);
+  const provider = useMemo(
+    () => getQAChatProvider(conversationKey),
+    [conversationKey],
+  );
   const requestPlaceholder = useCallback(
     (requestParams: Partial<QAAskInput>) =>
       createPendingQAChatMessage(
@@ -172,8 +213,28 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     onRequest,
     isRequesting,
     abort,
+    isDefaultMessagesRequesting,
   } = useXChat<ChatMessageOut, ChatMessageOut, QAAskInput>({
     provider,
+    conversationKey,
+    defaultMessages: async (info?: { conversationKey?: string }) => {
+      const sessionId = getSessionIdFromConversationKey(info?.conversationKey);
+      if (sessionId == null) return [];
+
+      try {
+        const data = await apiFetch<SessionDetail>(`/qa/sessions/${sessionId}`);
+        return (data.messages ?? []).map(
+          (chatMessage): MessageInfo<ChatMessageOut> => ({
+            id: chatMessage.id,
+            message: normalizeMessageAnswer(chatMessage),
+            status: "success",
+          }),
+        );
+      } catch {
+        message.error("加载会话记录失败");
+        return [];
+      }
+    },
     requestPlaceholder,
     requestFallback,
   });
@@ -248,33 +309,10 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   );
   const scopeDocs = scopeDocsData?.items ?? [];
 
-  // ── load messages of a session ──
-  const { loading: messagesLoading, run: loadMessages } = useRequest(
-    async (sessionId: number) => {
-      const data = await apiFetch<SessionDetail>(`/qa/sessions/${sessionId}`);
-      setChatMessageInfos(
-        (data.messages ?? []).map(
-          (chatMessage): MessageInfo<ChatMessageOut> => ({
-            id: chatMessage.id,
-            message: normalizeMessageAnswer(chatMessage),
-            status: "success",
-          }),
-        ),
-      );
-    },
-    {
-      manual: true,
-      onError: () => {
-        message.error("加载会话记录失败");
-      },
-    },
-  );
-
   useEffect(() => {
     const rawSessionId = sessionIdParam;
     if (!rawSessionId) {
       setActiveId(null);
-      setChatMessageInfos([]);
       localSessionUrlSyncRef.current = null;
       return;
     }
@@ -282,7 +320,6 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     const nextSessionId = Number(rawSessionId);
     if (!Number.isFinite(nextSessionId)) {
       setActiveId(null);
-      setChatMessageInfos([]);
       localSessionUrlSyncRef.current = null;
       return;
     }
@@ -292,9 +329,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
       localSessionUrlSyncRef.current = null;
       return;
     }
-
-    loadMessages(nextSessionId);
-  }, [sessionIdParam, loadMessages, setChatMessageInfos]);
+  }, [sessionIdParam]);
 
   const streamedSessionId = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -308,13 +343,21 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     if (activeId || streamedSessionId == null) return;
     if (localSessionUrlSyncRef.current === streamedSessionId) return;
 
+    const streamedConversationKey = getSessionConversationKey(streamedSessionId);
+    if (conversationKey !== streamedConversationKey) {
+      setConversationAliases((current) => ({
+        ...current,
+        [streamedConversationKey]: conversationKey,
+      }));
+    }
+
     localSessionUrlSyncRef.current = streamedSessionId;
     setActiveId(streamedSessionId);
     replaceCurrentSessionUrl(streamedSessionId);
     Promise.resolve(loadSessions()).finally(() => {
       window.dispatchEvent(new Event("qa:sessions-updated"));
     });
-  }, [activeId, loadSessions, streamedSessionId]);
+  }, [activeId, conversationKey, loadSessions, streamedSessionId]);
 
   // ── ask question (streaming) ────────────────────────────────────
 
@@ -345,7 +388,13 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
       }
 
       const requestId = createRequestId();
-      activeRequestIdRef.current = requestId;
+      requestIdByConversationRef.current.set(conversationKey, requestId);
+      refreshAfterRequestByConversationRef.current.set(
+        conversationKey,
+        activeId !== null &&
+          (sessions.find((session) => session.id === activeId)?.title ||
+            "新会话") === "新会话",
+      );
 
       onRequest({
         question: q,
@@ -359,9 +408,11 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     },
     [
       activeId,
+      conversationKey,
       editingMessageId,
       onRequest,
       question,
+      sessions,
       scopeCategoryIds,
       scopeDocumentIds,
       selectedLlmId,
@@ -370,7 +421,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   );
 
   const handleCancel = useCallback(() => {
-    const requestId = activeRequestIdRef.current;
+    const requestId = requestIdByConversationRef.current.get(conversationKey);
     if (requestId) {
       void apiFetch("/qa/ask/cancel", {
         method: "POST",
@@ -381,14 +432,35 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     }
 
     abort();
-    activeRequestIdRef.current = null;
-  }, [abort]);
+    requestIdByConversationRef.current.delete(conversationKey);
+  }, [abort, conversationKey]);
 
   useEffect(() => {
-    if (!isRequesting) {
-      activeRequestIdRef.current = null;
+    if (isRequesting) return;
+
+    requestIdByConversationRef.current.delete(conversationKey);
+    if (conversationAliases[routeConversationKey]) {
+      setConversationAliases((current) => {
+        const { [routeConversationKey]: _endedAlias, ...rest } = current;
+        return rest;
+      });
     }
-  }, [isRequesting]);
+
+    if (!refreshAfterRequestByConversationRef.current.get(conversationKey)) {
+      return;
+    }
+
+    refreshAfterRequestByConversationRef.current.delete(conversationKey);
+    Promise.resolve(loadSessions()).finally(() => {
+      window.dispatchEvent(new Event("qa:sessions-updated"));
+    });
+  }, [
+    conversationAliases,
+    conversationKey,
+    isRequesting,
+    loadSessions,
+    routeConversationKey,
+  ]);
 
   // ── auto-scroll to bottom (throttled) ──────────────────────────
 
@@ -506,7 +578,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
 
         {/* Messages area */}
         <div className="flex-1 overflow-auto bg-white px-6 py-[34px] pb-7 cursor-default">
-          {messagesLoading ? (
+          {isDefaultMessagesRequesting ? (
             <div
               className="w-full max-w-[680px] mx-auto cursor-default"
               style={{ padding: "24px 32px" }}

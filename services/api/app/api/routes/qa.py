@@ -36,6 +36,7 @@ from app.services.chat_branching import (
 from app.services.chat_persistence import (
     persist_new_chat_session,
     persist_streamed_chat_message,
+    update_session_title_for_first_question,
 )
 from app.services.llm_factory import create_chat_model
 from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
@@ -123,6 +124,11 @@ def _resolve_session(
         )
         if not session:
             raise HTTPException(status_code=404, detail="会话不存在")
+        update_session_title_for_first_question(
+            db,
+            session=session,
+            question=question,
+        )
         return session
 
     return persist_new_chat_session(

@@ -3,7 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from sqlalchemy import func
+
 from app.models.chat import ChatMessage, ChatSession, Citation
+
+
+def _first_line(text: str, max_len: int = 60) -> str:
+    line = text.split("\n")[0].strip()
+    return line[:max_len] + ("…" if len(line) > max_len else "")
 
 
 def persist_new_chat_session(
@@ -20,6 +27,28 @@ def persist_new_chat_session(
     db.flush()
     db.commit()
     return session
+
+
+def update_session_title_for_first_question(
+    db: Any,
+    *,
+    session: ChatSession,
+    question: str,
+) -> None:
+    if session.title != "新会话":
+        return
+
+    message_count = (
+        db.query(func.count(ChatMessage.id))
+        .filter(ChatMessage.session_id == session.id)
+        .scalar()
+    )
+    if message_count:
+        return
+
+    session.title = _first_line(question)
+    db.add(session)
+    db.commit()
 
 
 def persist_streamed_chat_message(
