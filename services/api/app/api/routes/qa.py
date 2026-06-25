@@ -319,23 +319,8 @@ def _resolve_target_document_ids(
     return list(target_ids)
 
 
-def _retrieve_chunks(
-    question: str,
-    db: Session,
-    top_k: int = 5,
-    target_document_ids: list[int] | None = None,
-) -> list[dict[str, Any]]:
-    """Retrieve the most relevant document chunks via pgvector ANN search.
-
-    Generates an embedding for the question, then performs cosine similarity
-    search against the document_chunks table.
-
-    When `target_document_ids` is provided, only chunks belonging to those
-    documents are considered.
-    """
-    if target_document_ids == []:
-        return []
-
+def _compute_query_embedding(question: str) -> list[float]:
+    """Compute the query embedding (synchronous, may load model weights)."""
     provider = settings.embedding_provider
 
     if provider == "huggingface":
@@ -358,7 +343,31 @@ def _retrieve_chunks(
             base_url=active_cfg.base_url,
         )
 
-    query_embedding = embed_model.embed_query(question)
+    return embed_model.embed_query(question)
+
+
+async def _retrieve_chunks(
+    question: str,
+    db: Session,
+    top_k: int = 5,
+    target_document_ids: list[int] | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve the most relevant document chunks via pgvector ANN search.
+
+    Generates an embedding for the question, then performs cosine similarity
+    search against the document_chunks table.
+
+    When `target_document_ids` is provided, only chunks belonging to those
+    documents are considered.
+
+    The embedding computation runs in a worker thread so that a slow model
+    load / inference does not block the event loop (which would starve
+    concurrent requests such as POST /sessions).
+    """
+    if target_document_ids == []:
+        return []
+
+    query_embedding = await asyncio.to_thread(_compute_query_embedding, question)
 
     query = db.query(DocumentChunk, KnowledgeDocument).join(
         KnowledgeDocument,
@@ -695,7 +704,7 @@ async def ask_question_stream(
             return _empty_stream_response()
 
         # Retrieve relevant chunks via pgvector ANN search (scoped)
-        retrieved_chunks = _retrieve_chunks(
+        retrieved_chunks = await _retrieve_chunks(
             retrieval_question, db, target_document_ids=target_document_ids,
         )
 

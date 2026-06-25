@@ -9,6 +9,7 @@ Supported providers:
 - huggingface → HuggingFaceEmbeddings (local, no API key needed)
 """
 
+import threading
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
@@ -25,31 +26,24 @@ _EMBEDDING_REGISTRY: dict[str, tuple[str, str | None]] = {
 
 SUPPORTED_EMBEDDING_PROVIDERS = sorted(_EMBEDDING_REGISTRY.keys())
 
+# Module-level cache for Embeddings instances.
+#
+# HuggingFaceEmbeddings loads model weights into memory on construction,
+# which can take several seconds. Constructing a fresh instance on every
+# request blocks the event loop (ask_question_stream is an async def) and
+# starves concurrent requests such as POST /sessions. Caching the instance
+# per (provider, model_name, api_key, base_url) avoids the repeated reload.
+_EMBEDDING_CACHE: dict[str, Embeddings] = {}
+_EMBEDDING_CACHE_LOCK = threading.Lock()
 
-def create_embeddings(
+
+def _instantiate_embeddings(
     provider: str,
     model_name: str,
-    api_key: str = "",
-    base_url: str | None = None,
+    api_key: str,
+    base_url: str | None,
 ) -> Embeddings:
-    """Create a LangChain Embeddings instance.
-
-    Args:
-        provider:   One of SUPPORTED_EMBEDDING_PROVIDERS.
-        model_name: Embedding model identifier (e.g. "text-embedding-ada-002" for OpenAI,
-                    "sentence-transformers/all-mpnet-base-v2" for HuggingFace).
-        api_key:    API key or token (not needed for huggingface).
-        base_url:   Override the default base URL.
-
-    Returns:
-        A LangChain Embeddings instance.
-    """
-    if provider not in _EMBEDDING_REGISTRY:
-        raise ValueError(
-            f"Unsupported embedding provider: {provider}. "
-            f"Supported: {SUPPORTED_EMBEDDING_PROVIDERS}"
-        )
-
+    """Create a brand-new Embeddings instance (slow: may load model weights)."""
     cls_name, default_base = _EMBEDDING_REGISTRY[provider]
     resolved_base = base_url or default_base
 
@@ -73,3 +67,46 @@ def create_embeddings(
         )
 
     raise ValueError(f"Unknown embedding class: {cls_name}")
+
+
+def create_embeddings(
+    provider: str,
+    model_name: str,
+    api_key: str = "",
+    base_url: str | None = None,
+) -> Embeddings:
+    """Create (or reuse a cached) LangChain Embeddings instance.
+
+    Args:
+        provider:   One of SUPPORTED_EMBEDDING_PROVIDERS.
+        model_name: Embedding model identifier (e.g. "text-embedding-ada-002" for OpenAI,
+                    "sentence-transformers/all-mpnet-base-v2" for HuggingFace).
+        api_key:    API key or token (not needed for huggingface).
+        base_url:   Override the default base URL.
+
+    Returns:
+        A LangChain Embeddings instance.
+    """
+    if provider not in _EMBEDDING_REGISTRY:
+        raise ValueError(
+            f"Unsupported embedding provider: {provider}. "
+            f"Supported: {SUPPORTED_EMBEDDING_PROVIDERS}"
+        )
+
+    cache_key = f"{provider}:{model_name}:{api_key}:{base_url or ''}"
+
+    # Fast path: return cached instance without acquiring the lock.
+    cached = _EMBEDDING_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Slow path: instantiate (may take seconds) under a lock so we don't
+    # build duplicate instances for the same key concurrently.
+    with _EMBEDDING_CACHE_LOCK:
+        cached = _EMBEDDING_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+        instance = _instantiate_embeddings(provider, model_name, api_key, base_url)
+        _EMBEDDING_CACHE[cache_key] = instance
+        return instance
