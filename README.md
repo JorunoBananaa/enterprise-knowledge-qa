@@ -17,7 +17,7 @@
 | **向量化**   | HuggingFace (默认) / OpenAI / DeepSeek / 智谱 / 通义千问   | 多提供商 Embedding             |
 | **大模型**   | DeepSeek / OpenAI / Anthropic / 智谱 / 通义千问 / Moonshot | 多提供商 LLM                   |
 | **文档解析** | PyPDF / python-docx / python-pptx / openpyxl               | PDF、Word、PPT、Excel、TXT、Markdown、CSV |
-| **OCR**      | PaddleOCR-VL（百度智能云 AI Studio）                        | 文档内嵌图片文字识别             |
+| **OCR**      | PaddleOCR-VL-1.6（百度智能云 AI Studio）                     | 文档内嵌图片文字识别             |
 | **认证**     | JWT (python-jose) + bcrypt + HttpOnly Cookie               | 无状态鉴权                     |
 | **部署**     | Docker Compose                                             | 一键启动 PostgreSQL + pgvector |
 
@@ -259,12 +259,13 @@ pnpm dev:web-app
 
 | 前缀           | 模块     | 说明                                |
 | -------------- | -------- | ----------------------------------- |
+| `/health`      | 健康检查 | `GET /health` 返回服务状态          |
 | `/auth`        | 认证     | 登录、登出、当前用户                |
 | `/categories`  | 知识分类 | 分类列表、创建、更新、删除          |
 | `/documents`   | 文档管理 | 上传、列表、删除                    |
 | `/llm-configs` | LLM 配置 | CRUD                                |
 | `/prompts`     | 提示词   | CRUD                                |
-| `/qa`          | 问答     | 会话列表、会话详情、删除会话、SSE 问答、取消生成、问题编辑重新生成、消息分支 |
+| `/qa`          | 问答     | 会话列表、创建会话、会话详情、删除会话、SSE 问答、取消生成、问题编辑重新生成、消息分支 |
 | `/review`      | 审核     | 文档审核工作流                      |
 | `/users`       | 用户管理 | CRUD（管理员权限）                  |
 
@@ -342,7 +343,8 @@ SSE 事件：
 | `EMBEDDING_MODEL_NAME`        | `sentence-transformers/all-MiniLM-L6-v2`                     | Embedding 模型 |
 | `EMBEDDING_DIMENSION`         | `384`                                                        | 向量维度       |
 | `UPLOAD_DIR`                  | `storage/uploads`                                            | 文件上传目录   |
-| `PADDLEOCR_TOKEN`             | 内置演示 Token                                               | PaddleOCR API Token（图片 OCR，可选） |
+
+> **注：** `PADDLEOCR_TOKEN`（图片 OCR，可选）不在 `config.py` 中管理，而是由 `services/api/app/services/ocr.py` 通过 `os.getenv('PADDLEOCR_TOKEN', ...)` 直接读取，未设置时使用代码内置的演示 Token。
 
 ### 开发脚本
 
