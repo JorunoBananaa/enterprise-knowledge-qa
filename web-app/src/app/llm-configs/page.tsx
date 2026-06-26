@@ -147,24 +147,30 @@ export default function LLMConfigPage() {
     setModalOpen(true);
   }, [form]);
 
-  const openEdit = useCallback((record: LLMConfigItem) => {
-    setEditingId(record.id);
-    form.setFieldsValue({
-      name: record.name,
-      provider: record.provider,
-      model_name: record.model_name,
-      api_key: "",
-      base_url: record.base_url || "",
-    });
-    setModalOpen(true);
-  }, [form]);
+  const openEdit = useCallback(
+    (record: LLMConfigItem) => {
+      setEditingId(record.id);
+      form.setFieldsValue({
+        name: record.name,
+        provider: record.provider,
+        model_name: record.model_name,
+        api_key: "",
+        base_url: record.base_url || "",
+      });
+      setModalOpen(true);
+    },
+    [form],
+  );
 
-  const handleProviderChange = useCallback((provider: string) => {
-    const meta = PROVIDER_META[provider];
-    if (meta) {
-      form.setFieldsValue({ model_name: meta.model, base_url: meta.baseUrl });
-    }
-  }, [form]);
+  const handleProviderChange = useCallback(
+    (provider: string) => {
+      const meta = PROVIDER_META[provider];
+      if (meta) {
+        form.setFieldsValue({ model_name: meta.model, base_url: meta.baseUrl });
+      }
+    },
+    [form],
+  );
 
   // ── 提交（新建 / 编辑） ──
   const onMutateSuccess = () => {
@@ -231,33 +237,36 @@ export default function LLMConfigPage() {
     },
   );
 
-  const doActivate = useCallback((id: number) => {
-    setActivatingId(id);
-    handleActivate(id);
-  }, [handleActivate]);
-
-  // ── 连通性测试 ──
-  const { run: runTest } = useApi(
-    (id: number) => `/llm-configs/${id}/test`,
-    {
-      method: "POST",
-      manual: true,
-      onSuccess: () => {
-        message.success("连通性测试通过");
-      },
-      onError: (err) => {
-        message.error(err instanceof Error ? err.message : "连通性测试失败");
-      },
-      onFinally: () => {
-        setTestingId(null);
-      },
+  const doActivate = useCallback(
+    (id: number) => {
+      setActivatingId(id);
+      handleActivate(id);
     },
+    [handleActivate],
   );
 
-  const handleTest = useCallback((id: number) => {
-    setTestingId(id);
-    runTest(id);
-  }, [runTest]);
+  // ── 连通性测试 ──
+  const { run: runTest } = useApi((id: number) => `/llm-configs/${id}/test`, {
+    method: "POST",
+    manual: true,
+    onSuccess: () => {
+      message.success("连通性测试通过");
+    },
+    onError: (err) => {
+      message.error(err instanceof Error ? err.message : "连通性测试失败");
+    },
+    onFinally: () => {
+      setTestingId(null);
+    },
+  });
+
+  const handleTest = useCallback(
+    (id: number) => {
+      setTestingId(id);
+      runTest(id);
+    },
+    [runTest],
+  );
 
   // ── 删除配置 ──
   const { run: handleDelete } = useApi((id: number) => `/llm-configs/${id}`, {
@@ -275,10 +284,13 @@ export default function LLMConfigPage() {
     },
   });
 
-  const doDelete = useCallback((id: number) => {
-    setDeletingId(id);
-    handleDelete(id);
-  }, [handleDelete]);
+  const doDelete = useCallback(
+    (id: number) => {
+      setDeletingId(id);
+      handleDelete(id);
+    },
+    [handleDelete],
+  );
 
   const columns = useMemo(
     () => [
@@ -518,13 +530,6 @@ export default function LLMConfigPage() {
                   暂未添加任何大模型配置
                 </Text>
               </div>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={openCreate}
-              >
-                立即添加
-              </Button>
             </div>
           ),
         }}

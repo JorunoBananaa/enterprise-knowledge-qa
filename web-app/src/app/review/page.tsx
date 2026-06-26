@@ -8,6 +8,7 @@ import DocumentStatusBadge from "@/components/DocumentStatusBadge";
 import PageHeader from "@/components/PageHeader";
 
 const { Text } = Typography;
+type ReviewAction = "approve" | "reject";
 
 interface Document {
   id: number;
@@ -20,62 +21,93 @@ interface Document {
 
 export default function ReviewPage() {
   const { message } = App.useApp();
-  const [actionLoading, setActionLoading] = useState<{
-    docId: number;
-    action: "approve" | "reject";
-  } | null>(null);
+  const [loadingActions, setLoadingActions] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [completedDocIds, setCompletedDocIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+
+  const getActionKey = (docId: number, action: ReviewAction) =>
+    `${docId}:${action}`;
+
+  const setActionLoading = (
+    docId: number,
+    action: ReviewAction,
+    loading: boolean,
+  ) => {
+    setLoadingActions((prev) => {
+      const next = new Set(prev);
+      const key = getActionKey(docId, action);
+
+      if (loading) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+
+      return next;
+    });
+  };
+
+  const isActionLoading = (docId: number, action: ReviewAction) =>
+    loadingActions.has(getActionKey(docId, action));
 
   const {
     data: docsData,
-    loading,
+    loading: docsLoading,
     run: fetchDocs,
   } = useApi<{ items: Document[] }>("/documents?review_status=pending_review");
-  const docs = docsData?.items;
+  const docs = docsData?.items ?? [];
+  const visibleDocs = docs.filter((doc) => !completedDocIds.has(doc.id));
+  const initialLoading = docsLoading && docsData == null;
 
-  const { run: handleApprove } = useApi(
+  const { runAsync: handleApprove } = useApi(
     (id: number) => `/review/documents/${id}/approve`,
     {
       method: "POST",
       manual: true,
-      onSuccess: () => {
-        message.success("文档已通过审核并完成索引");
-        fetchDocs();
-      },
-      onError: (err) => {
-        message.error(err instanceof Error ? err.message : "审核通过操作失败");
-      },
-      onFinally: () => {
-        setActionLoading(null);
-      },
     },
   );
 
-  const { run: handleReject } = useApi(
+  const { runAsync: handleReject } = useApi(
     (id: number) => `/review/documents/${id}/reject`,
     {
       method: "POST",
       manual: true,
-      onSuccess: () => {
-        message.success("文档已驳回");
-        fetchDocs();
-      },
-      onError: (err) => {
-        message.error(err instanceof Error ? err.message : "驳回操作失败");
-      },
-      onFinally: () => {
-        setActionLoading(null);
-      },
     },
   );
 
-  const doApprove = (id: number) => {
-    setActionLoading({ docId: id, action: "approve" });
-    handleApprove(id);
+  const doApprove = async (id: number) => {
+    if (isActionLoading(id, "approve")) return;
+
+    setActionLoading(id, "approve", true);
+    try {
+      await handleApprove(id);
+      setCompletedDocIds((prev) => new Set(prev).add(id));
+      message.success("文档已通过审核并完成索引");
+      fetchDocs();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "审核通过操作失败");
+    } finally {
+      setActionLoading(id, "approve", false);
+    }
   };
 
-  const doReject = (id: number) => {
-    setActionLoading({ docId: id, action: "reject" });
-    handleReject(id);
+  const doReject = async (id: number) => {
+    if (isActionLoading(id, "reject")) return;
+
+    setActionLoading(id, "reject", true);
+    try {
+      await handleReject(id);
+      setCompletedDocIds((prev) => new Set(prev).add(id));
+      message.success("文档已驳回");
+      fetchDocs();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "驳回操作失败");
+    } finally {
+      setActionLoading(id, "reject", false);
+    }
   };
 
   return (
@@ -88,26 +120,20 @@ export default function ReviewPage() {
       />
 
       <Card>
-        <Spin spinning={loading}>
-          {!loading && (docs ?? []).length === 0 ? (
+        <Spin spinning={initialLoading}>
+          {!initialLoading && visibleDocs.length === 0 ? (
             <Empty description="暂无待审核文档" />
           ) : (
             <List
-              dataSource={docs ?? []}
+              dataSource={visibleDocs}
               renderItem={(doc) => (
                 <List.Item
                   actions={[
                     <Button
                       type="primary"
                       icon={<CheckOutlined />}
-                      loading={
-                        actionLoading?.docId === doc.id &&
-                        actionLoading?.action === "approve"
-                      }
-                      disabled={
-                        actionLoading?.docId === doc.id &&
-                        actionLoading?.action === "reject"
-                      }
+                      loading={isActionLoading(doc.id, "approve")}
+                      disabled={isActionLoading(doc.id, "reject")}
                       onClick={() => doApprove(doc.id)}
                     >
                       通过
@@ -115,14 +141,8 @@ export default function ReviewPage() {
                     <Button
                       danger
                       icon={<CloseOutlined />}
-                      loading={
-                        actionLoading?.docId === doc.id &&
-                        actionLoading?.action === "reject"
-                      }
-                      disabled={
-                        actionLoading?.docId === doc.id &&
-                        actionLoading?.action === "approve"
-                      }
+                      loading={isActionLoading(doc.id, "reject")}
+                      disabled={isActionLoading(doc.id, "approve")}
                       onClick={() => doReject(doc.id)}
                     >
                       驳回

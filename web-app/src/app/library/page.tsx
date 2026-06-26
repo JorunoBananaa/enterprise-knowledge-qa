@@ -459,7 +459,7 @@ function LibraryPageContent() {
             <Button
               type="text"
               size="small"
-              className="opacity-0 group-hover/tree:opacity-100 transition-opacity duration-200 absolute right-1 top-1/2 -translate-y-1/2"
+              className="!absolute !right-1 !top-1/2 !h-6 !w-6 !min-w-6 !p-0 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover/tree:opacity-100"
               icon={<MoreOutlined className="text-[13px]" />}
               onClick={(e) => e.stopPropagation()}
             />
