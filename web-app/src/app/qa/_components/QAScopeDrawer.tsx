@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { Key } from "react";
 import {
   Button,
@@ -16,6 +16,12 @@ import {
   FolderOutlined,
 } from "@ant-design/icons";
 import type { CatTreeNode, DocumentItem } from "../_types";
+import {
+  getCategoryCheckKeys,
+  getEffectiveDocumentIds,
+  updateActiveCategoryDocuments,
+  updateCategorySelection,
+} from "../_lib/scope-selection.mjs";
 
 interface QAScopeDrawerProps {
   open: boolean;
@@ -23,7 +29,6 @@ interface QAScopeDrawerProps {
   activeDrawerCatId: number | null;
   activeDrawerCatName: string;
   scopeCategoryIds: number[];
-  scopeCategoryKeys: string[];
   scopeDocumentIds: number[];
   scopeDocs: DocumentItem[];
   scopeLabel: string;
@@ -41,7 +46,6 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
   activeDrawerCatId,
   activeDrawerCatName,
   scopeCategoryIds,
-  scopeCategoryKeys,
   scopeDocumentIds,
   scopeDocs,
   scopeLabel,
@@ -52,6 +56,41 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
   onDocumentIdsChange,
   onActiveDrawerCatIdChange,
 }: QAScopeDrawerProps) {
+  const visibleDocumentIds = useMemo(
+    () => scopeDocs.map((doc) => doc.id),
+    [scopeDocs],
+  );
+  const categoryCheckKeys = useMemo(
+    () =>
+      getCategoryCheckKeys({
+        categoryIds: scopeCategoryIds,
+        documentIds: scopeDocumentIds,
+        activeCategoryId: activeDrawerCatId,
+        visibleDocumentIds,
+      }),
+    [
+      activeDrawerCatId,
+      scopeCategoryIds,
+      scopeDocumentIds,
+      visibleDocumentIds,
+    ],
+  );
+  const effectiveDocumentIds = useMemo(
+    () =>
+      getEffectiveDocumentIds({
+        categoryIds: scopeCategoryIds,
+        documentIds: scopeDocumentIds,
+        activeCategoryId: activeDrawerCatId,
+        visibleDocumentIds,
+      }),
+    [
+      activeDrawerCatId,
+      scopeCategoryIds,
+      scopeDocumentIds,
+      visibleDocumentIds,
+    ],
+  );
+
   return (
     <Drawer
       title={
@@ -122,7 +161,7 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
                 checkable
                 checkStrictly={false}
                 treeData={catTree}
-                checkedKeys={scopeCategoryKeys}
+                checkedKeys={categoryCheckKeys}
                 onCheck={(checked) => {
                   const rawKeys = Array.isArray(checked)
                     ? checked
@@ -133,7 +172,15 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
                         typeof key === "string" && key.startsWith("cat-"),
                     )
                     .map((key) => Number(key.slice(4)));
-                  onCategoryIdsChange(catIds);
+                  const nextScope = updateCategorySelection({
+                    nextCategoryIds: catIds,
+                    categoryIds: scopeCategoryIds,
+                    documentIds: scopeDocumentIds,
+                    activeCategoryId: activeDrawerCatId,
+                    visibleDocumentIds,
+                  });
+                  onCategoryIdsChange(nextScope.categoryIds);
+                  onDocumentIdsChange(nextScope.documentIds);
                 }}
                 onSelect={(keys) => {
                   const key = keys[0];
@@ -179,12 +226,12 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
                 ? `文档 · ${activeDrawerCatName}`
                 : "文档列表"}
             </span>
-            {activeDrawerCatId != null && scopeDocumentIds.length > 0 ? (
+            {activeDrawerCatId != null && effectiveDocumentIds.length > 0 ? (
               <Tag
                 color="blue"
                 className="!m-0 !text-[10px] !leading-[16px] !px-[6px]"
               >
-                {scopeDocumentIds.length}
+                {effectiveDocumentIds.length}
               </Tag>
             ) : null}
           </div>
@@ -192,10 +239,18 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
             {activeDrawerCatId != null ? (
               scopeDocs.length > 0 ? (
                 <Checkbox.Group
-                  value={scopeDocumentIds}
-                  onChange={(values) =>
-                    onDocumentIdsChange(values as number[])
-                  }
+                  value={effectiveDocumentIds}
+                  onChange={(values) => {
+                    const nextScope = updateActiveCategoryDocuments({
+                      nextVisibleDocumentIds: values as number[],
+                      categoryIds: scopeCategoryIds,
+                      documentIds: scopeDocumentIds,
+                      activeCategoryId: activeDrawerCatId,
+                      visibleDocumentIds,
+                    });
+                    onCategoryIdsChange(nextScope.categoryIds);
+                    onDocumentIdsChange(nextScope.documentIds);
+                  }}
                   className="w-full"
                 >
                   <Space direction="vertical" className="w-full" size={0}>
@@ -203,7 +258,7 @@ const QAScopeDrawer = memo(function QAScopeDrawer({
                       <div
                         key={doc.id}
                         className={`flex items-center gap-2.5 py-2 px-2.5 rounded-md transition-colors -mx-2.5 ${
-                          scopeDocumentIds.includes(doc.id)
+                          effectiveDocumentIds.includes(doc.id)
                             ? "bg-blue-50/60"
                             : "hover:bg-zinc-50"
                         }`}

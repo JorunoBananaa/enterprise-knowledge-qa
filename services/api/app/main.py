@@ -24,6 +24,7 @@ def _seed_database() -> None:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
     Base.metadata.create_all(bind=engine)
+    _ensure_citation_document_delete_behavior()
 
     db = SessionLocal()
     try:
@@ -54,6 +55,50 @@ def _seed_database() -> None:
 
     finally:
         db.close()
+
+
+def _ensure_citation_document_delete_behavior() -> None:
+    """Keep historical citations when their source document is deleted."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE citations ALTER COLUMN document_id DROP NOT NULL"))
+        conn.execute(
+            text(
+                """
+                DO $$
+                DECLARE
+                    existing_constraint text;
+                BEGIN
+                    SELECT tc.constraint_name
+                    INTO existing_constraint
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = current_schema()
+                      AND tc.table_name = 'citations'
+                      AND kcu.column_name = 'document_id'
+                    LIMIT 1;
+
+                    IF existing_constraint IS NOT NULL THEN
+                        EXECUTE format(
+                            'ALTER TABLE citations DROP CONSTRAINT %I',
+                            existing_constraint
+                        );
+                    END IF;
+
+                    ALTER TABLE citations
+                    ADD CONSTRAINT citations_document_id_fkey
+                    FOREIGN KEY (document_id)
+                    REFERENCES knowledge_documents(id)
+                    ON DELETE SET NULL;
+                END $$;
+                """
+            )
+        )
 
 
 @asynccontextmanager

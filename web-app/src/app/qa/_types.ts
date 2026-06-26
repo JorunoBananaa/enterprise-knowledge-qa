@@ -32,7 +32,7 @@ export interface SessionDetail extends SessionItem {
 
 export interface CitationItem {
   id?: number | null;
-  document_id: number;
+  document_id: number | null;
   document_title?: string | null;
   document_name?: string | null;
   document_file_type?: string | null;
@@ -48,7 +48,7 @@ export interface CitationItem {
 export interface SourceSummary {
   key: string;
   name: string;
-  documentId: number;
+  documentId: number | null;
   fileType?: string | null;
   document_path?: string | null;
   categoryId?: number | null;

@@ -162,7 +162,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
 
   // ── 范围派生状态 ──
   const scopeTotal = scopeCategoryIds.length + scopeDocumentIds.length;
-  const scopeLabel = scopeTotal === 0 ? "全部知识库" : `已选 ${scopeTotal} 项`;
+  const scopeLabel = scopeTotal === 0 ? "全部知识库" : `已限制范围`;
 
   // ── 聊天提供器 ──
   const provider = useMemo(
@@ -294,11 +294,6 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     () => categories.find((c) => c.id === activeDrawerCatId)?.name ?? "",
     [activeDrawerCatId, categories],
   );
-  const scopeCategoryKeys = useMemo(
-    () => scopeCategoryIds.map((id) => `cat-${id}`),
-    [scopeCategoryIds],
-  );
-
   // ── 当前抽屉分类下的文档 ──
   const { data: scopeDocsData } = useRequest(
     async () => {
@@ -710,7 +705,6 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
         activeDrawerCatId={activeDrawerCatId}
         activeDrawerCatName={activeDrawerCatName}
         scopeCategoryIds={scopeCategoryIds}
-        scopeCategoryKeys={scopeCategoryKeys}
         scopeDocumentIds={scopeDocumentIds}
         scopeDocs={scopeDocs}
         scopeLabel={scopeLabel}

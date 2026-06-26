@@ -44,7 +44,10 @@ class Citation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_message_id: Mapped[int] = mapped_column(ForeignKey("chat_messages.id", ondelete="CASCADE"))
-    document_id: Mapped[int] = mapped_column(ForeignKey("knowledge_documents.id"))
+    document_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("knowledge_documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     chunk_id: Mapped[int]
     locator: Mapped[str] = mapped_column(Text)
     quoted_text_preview: Mapped[str] = mapped_column(Text, default="")

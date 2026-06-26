@@ -25,7 +25,7 @@ class AskCancelRequest(BaseModel):
 
 class CitationOut(BaseModel):
     id: int | None = None
-    document_id: int
+    document_id: int | None = None
     document_title: str | None = None
     document_name: str | None = None
     document_file_type: str | None = None

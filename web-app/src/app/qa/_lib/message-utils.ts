@@ -45,7 +45,9 @@ function getCitationDocumentName(citation: CitationItem): string {
   return (
     citation.document_name?.trim() ||
     citation.document_title?.trim() ||
-    `文档 ${citation.document_id}`
+    (citation.document_id == null
+      ? "已删除文档"
+      : `文档 ${citation.document_id}`)
   );
 }
 
@@ -55,7 +57,10 @@ export function buildSourceSummaries(
   const sourceMap = new Map<string, SourceSummary>();
 
   for (const citation of citations) {
-    const key = String(citation.document_id);
+    const key =
+      citation.document_id == null
+        ? "deleted-document"
+        : String(citation.document_id);
     const current = sourceMap.get(key);
     if (current) {
       current.citations.push(citation);

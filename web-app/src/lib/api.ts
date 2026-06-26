@@ -90,7 +90,7 @@ export type StreamEvent =
   | { type: "chunk"; text: string }
   | {
       type: "citation";
-      document_id: number;
+      document_id: number | null;
       document_title?: string;
       document_name?: string;
       document_file_type?: string;
