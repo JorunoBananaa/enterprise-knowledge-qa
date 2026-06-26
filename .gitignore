@@ -9,7 +9,7 @@ node_modules/
 test.db
 .pytest_cache/
 .worktrees/
+docs/*
 
 services/api/storage/*
-!services/api/storage/uploads/
 !services/api/storage/uploads/README.md
