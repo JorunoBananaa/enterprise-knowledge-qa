@@ -18,7 +18,8 @@ ReviewListOutputMode = Literal["table", "count_only"]
 def review_list_tool(output_mode: ReviewListOutputMode = "table") -> str:
     """获取管理员可查看的待审核文档列表。
 
-    当用户想查看正在等待审核、批准、复核或流程处理的文档时使用。
+    仅当用户想查看“待审核文档”的列表或数量时使用。
+    不要用于查询文档索引状态、索引失败原因或文档详情。
     如果用户只询问数量或明确要求“数量即可”，output_mode 使用 count_only。
     """
     if output_mode == "count_only":
