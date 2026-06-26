@@ -14,6 +14,7 @@ from app.services.prompt_composer import (
     compose_system_message_content,
     compose_user_message_content,
 )
+from app.services.qa_tools import QaToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ async def answer_question_stream(
     user_prompt: str | None,
     llm: BaseChatModel,
     chat_history: list[dict[str, str]] | None = None,
+    tool_results: list[QaToolResult] | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """使用检索到的文档块流式回答问题。
 
@@ -131,6 +133,12 @@ async def answer_question_stream(
         {"type": "done", "status": "answered"}
         {"type": "error", "message": "..."}
     """
+    if tool_results:
+        for result in tool_results:
+            yield {"type": "chunk", "text": result.content}
+        yield {"type": "done", "status": "answered"}
+        return
+
     if not retrieved_chunks:
         yield {"type": "chunk", "text": INSUFFICIENT_EVIDENCE_ANSWER}
         yield {"type": "done", "status": "insufficient_evidence"}

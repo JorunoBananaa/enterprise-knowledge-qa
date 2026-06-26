@@ -13,6 +13,7 @@ from app.services.qa_graph import (
     RewriteQuestion,
     run_qa_graph,
 )
+from app.services.qa_tools import QaToolContext
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class QaStreamInput:
     rewrite_question: RewriteQuestion
     retrieve_chunks: RetrieveChunks
     answer_stream: AnswerStream
+    tool_context: QaToolContext | None = None
 
 
 async def stream_qa_events(payload: QaStreamInput) -> AsyncIterator[QaEvent]:
@@ -41,6 +43,7 @@ async def stream_qa_events(payload: QaStreamInput) -> AsyncIterator[QaEvent]:
         rewrite_question=payload.rewrite_question,
         retrieve_chunks=payload.retrieve_chunks,
         answer_stream=payload.answer_stream,
+        tool_context=payload.tool_context,
     )
     async for event in run_qa_graph(state, context):
         yield event
