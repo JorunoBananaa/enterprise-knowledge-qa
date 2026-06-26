@@ -16,7 +16,7 @@ class ParsedChunk:
 
 # ── 分块 ──────────────────────────────────────────────────────────
 
-_CHUNK_SIZE = 1000   # characters per chunk
+_CHUNK_SIZE = 1000   # 每个块的字符数
 _CHUNK_OVERLAP = 200
 
 
@@ -35,7 +35,7 @@ def _split_text_into_chunks(text: str, chunk_size: int = _CHUNK_SIZE, overlap: i
         else:
             if current:
                 chunks.append(current.strip())
-            # Keep overlap: carry over the tail of the previous chunk
+            # 保留重叠内容：带上前一个块的尾部
             if len(current) > overlap:
                 current = current[-overlap:] + sentence
             else:
@@ -171,7 +171,7 @@ def _extract_pptx_image_text_by_slide(prs) -> dict[int, list[str]]:
 
 
 def _parse_xlsx(path: str) -> list[ParsedChunk]:
-    """Extract text from XLSX sheets and embedded images."""
+    """从 XLSX 工作表和嵌入图片中提取文本。"""
     from openpyxl import load_workbook
 
     wb = load_workbook(path, read_only=False, data_only=True)
@@ -230,7 +230,7 @@ def _recognize_image_blob(blob: bytes, suffix: str) -> str:
 
 
 def _parse_txt(path: str) -> list[ParsedChunk]:
-    """Extract text from plain text files."""
+    """从纯文本文件中提取文本。"""
     text = Path(path).read_text(encoding="utf-8")
     text_chunks = _split_text_into_chunks(text)
     return [
@@ -239,7 +239,7 @@ def _parse_txt(path: str) -> list[ParsedChunk]:
     ]
 
 
-# ── Registry ──────────────────────────────────────────────────────────
+# ── 解析器注册表 ───────────────────────────────────────────────────────
 
 _PARSER_REGISTRY: dict[str, Callable[[str], list[ParsedChunk]]] = {
     "pdf":  _parse_pdf,
@@ -256,9 +256,9 @@ _PARSER_REGISTRY: dict[str, Callable[[str], list[ParsedChunk]]] = {
 
 
 def parse_document(storage_path: str, file_type: str) -> list[ParsedChunk]:
-    """Return parsed chunks with text and citation metadata.
+    """返回包含文本和引用元数据的解析块。
 
-    Routes to the appropriate parser based on file_type extension.
+    根据 file_type 扩展名路由到对应解析器。
     """
     ext = file_type.lstrip(".").lower()
     parser = _PARSER_REGISTRY.get(ext)

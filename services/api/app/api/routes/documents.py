@@ -25,7 +25,7 @@ def upload_document(
     file: Annotated[UploadFile, File()],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> DocumentResponse:
-    """Upload a document for review."""
+    """上传待审核文档。"""
     storage_path = save_upload(file)
 
     uploader_id = current_user.id
@@ -50,7 +50,7 @@ def get_documents(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ) -> DocumentListResponse:
-    """List documents with optional filters."""
+    """按可选条件筛选并列出文档。"""
     items, total = list_documents(
         category_id=category_id,
         review_status=review_status,
@@ -68,7 +68,7 @@ def get_document(
     document_id: int,
     _current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> DocumentResponse:
-    """Get a single document by ID."""
+    """根据 ID 获取单个文档。"""
     doc = get_document_by_id(document_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
@@ -80,7 +80,7 @@ def remove_document(
     document_id: int,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> None:
-    """Delete a document and its chunks (cascaded). Admin only."""
+    """删除文档及其块（级联删除），仅管理员可用。"""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

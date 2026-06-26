@@ -63,7 +63,7 @@ export default function UsersPage() {
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
 
-  // ── modals ──
+  // ── 弹窗状态 ──
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserItem | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<UserItem | null>(
@@ -75,7 +75,7 @@ export default function UsersPage() {
   const [editForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
 
-  // ── debounced search ────────────────────────────────────────
+  // ── 防抖搜索 ────────────────────────────────────────────────
   const debouncedSearch = useMemo(
     () =>
       debounce((value: string) => {
@@ -95,7 +95,7 @@ export default function UsersPage() {
     [debouncedSearch],
   );
 
-  // ── fetch users ─────────────────────────────────────────────
+  // ── 获取用户列表 ───────────────────────────────────────────
   const {
     data: listData = { items: [], total: 0 },
     loading,
@@ -117,7 +117,7 @@ export default function UsersPage() {
     },
   );
 
-  // ── create ──
+  // ── 新建用户 ──
   const { loading: creating, run: doCreate } = useApi("/users", {
     method: "POST",
     manual: true,
@@ -136,7 +136,7 @@ export default function UsersPage() {
     doCreate({ ...values, status: "active" });
   };
 
-  // ── edit ──
+  // ── 编辑用户 ──
   const openEdit = useCallback(
     (user: UserItem) => {
       setEditUser(user);
@@ -175,7 +175,7 @@ export default function UsersPage() {
     doUpdate(editUser.id, values);
   };
 
-  // ── reset password ──
+  // ── 重置密码 ──
   const openResetPassword = useCallback(
     (user: UserItem) => {
       setResetPasswordUser(user);
@@ -207,7 +207,7 @@ export default function UsersPage() {
 
   const submitting = creating || updating || resetting;
 
-  // ── disable toggle ──
+  // ── 启用 / 禁用切换 ──
   const { run: toggleDisable } = useApi((id: number) => `/users/${id}`, {
     method: "PATCH",
     manual: true,

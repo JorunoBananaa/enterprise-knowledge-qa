@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base ──────────────────────────────────────────────────────── */
+/* ── 基础样式 ─────────────────────────────────────────────────── */
 html {
   @apply bg-app-bg;
 }
@@ -15,7 +15,7 @@ code {
   @apply rounded-md bg-app-accent px-[5px] py-[2px] text-slate-700;
 }
 
-/* ── Cursor ───────────────────────────────────────────────────── */
+/* ── 鼠标指针 ─────────────────────────────────────────────────── */
 a,
 button,
 [role="button"] {
@@ -81,7 +81,7 @@ textarea.ant-input:not(.ant-input-disabled),
   cursor: text;
 }
 
-/* ── Ant Design refinements ───────────────────────────────────── */
+/* ── Ant Design 细节优化 ─────────────────────────────────────── */
 .ant-layout {
   background: transparent;
 }
@@ -181,7 +181,7 @@ textarea.ant-input:not(.ant-input-disabled),
   background: #f8fafc;
 }
 
-/* ── Sender overrides ─────────────────────────────────────────── */
+/* ── Sender 组件覆盖 ─────────────────────────────────────────── */
 .qa-compose .ant-btn-primary:hover:not(:disabled) {
   background: #171717 !important;
   color: #fff !important;
@@ -192,7 +192,7 @@ textarea.ant-input:not(.ant-input-disabled),
   color: inherit !important;
 }
 
-/* ── Ant Design Select refinements ───────────────────────────── */
+/* ── Ant Design Select 细节优化 ─────────────────────────────── */
 .ant-select.ant-select-outlined {
   border: 1px solid #d1d5db !important;
   border-radius: 8px !important;
@@ -354,7 +354,7 @@ textarea.ant-input:not(.ant-input-disabled),
   color: inherit !important;
 }
 
-/* ── QA Markdown answer ───────────────────────────────────────── */
+/* ── 问答 Markdown 答案 ──────────────────────────────────────── */
 .qa-answer-markdown {
   color: #1f2937;
   font-size: 14px;
@@ -465,7 +465,7 @@ textarea.ant-input:not(.ant-input-disabled),
   text-underline-offset: 3px;
 }
 
-/* ── Animations (used via inline style/animation) ──────────────── */
+/* ── 动画（通过内联样式 / animation 使用） ───────────────────── */
 @keyframes fadeInUp {
   from {
     opacity: 0;

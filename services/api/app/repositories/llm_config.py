@@ -82,12 +82,12 @@ def delete_llm_config(config_id: int) -> bool:
 
 
 def set_active_llm_config(config_id: int) -> LLMConfig | None:
-    """Activate one config and deactivate all others."""
+    """激活一个配置，并停用其他所有配置。"""
     db = SessionLocal()
     try:
-        # Deactivate all
+        # 停用全部配置
         db.query(LLMConfig).update({"is_active": False})
-        # Activate target
+        # 激活目标配置
         cfg = db.query(LLMConfig).filter(LLMConfig.id == config_id).first()
         if cfg is None:
             db.rollback()

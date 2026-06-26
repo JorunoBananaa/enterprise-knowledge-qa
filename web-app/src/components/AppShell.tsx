@@ -85,7 +85,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // 可见的全页闪烁。
   const userFirstLoadDone = useRef(false);
 
-  // ── current user ──
+  // ── 当前用户 ──
   const { data: user = null, loading: userLoading } = useRequest(
     async () => {
       if (pathname === "/login") return null;
@@ -105,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   );
 
-  // ── qa sessions ──
+  // ── 问答会话 ──
   const {
     data: qaSessions = EMPTY_QA_SESSIONS,
     loading: sessionsLoading,
@@ -115,7 +115,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refreshDeps: [Boolean(user)],
   });
 
-  // ── create session ──
+  // ── 创建会话 ──
   const { loading: creatingSession, run: createQaSession } = useApi<
     SessionItem,
     [],
@@ -150,7 +150,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     createQaSession();
   }, [createQaSession, qaSessions, router, setActiveConversationKey]);
 
-  // ── delete session ──
+  // ── 删除会话 ──
   const { run: handleDeleteSession } = useApi(
     (id: number) => `/qa/sessions/${id}`,
     {
@@ -177,12 +177,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // 顶层依赖 useSearchParams 即可读取。
   const currentSessionIdRef = useRef<string | null>(null);
 
-  // SessionHistoryBlock 用于更新 ref 的回调
+  // 会话历史区块用于更新 ref 的回调
   const handleCurrentSessionIdChange = useCallback((id: string | null) => {
     currentSessionIdRef.current = id;
   }, []);
 
-  // ── logout ──
+  // ── 退出登录 ──
   const { run: handleLogout } = useRequest(
     async () => {
       await logout();
@@ -213,7 +213,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const showSessionHistoryLoading =
     sessionsLoading && qaConversations.length === 0;
 
-  // ── route transition progress bar ──
+  // ── 路由切换进度条 ──
   const [navigating, setNavigating] = useState(false);
   const prevPathname = useRef(pathname);
   useEffect(() => {
@@ -225,7 +225,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
-  // ── listen for external session updates ──
+  // ── 监听外部会话更新 ──
   useEffect(() => {
     window.addEventListener("qa:sessions-updated", loadQaSessions);
     return () => {
@@ -451,7 +451,7 @@ function LatestQASessionRedirect({
   return null;
 }
 
-// ── SessionHistoryBlock ──────────────────────────────────────────────
+// ── 会话历史区块 ─────────────────────────────────────────────────────
 // 将 useSearchParams() 隔离在自己的 <Suspense> 边界内，
 // 使路由变化不会触发外层布局 Suspense / 全页重新加载。
 

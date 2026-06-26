@@ -7,7 +7,7 @@
  * @example // 带 refreshDeps 的 GET
  * const { data } = useApi<Doc[]>("/documents", { refreshDeps: [filter] });
  *
- * @example // 手动 POST mutation — body 由 run(body) 传入
+ * @example // 手动 POST 变更请求 — 请求体由 run(body) 传入
  * const { run, loading } = useApi<User>("/users", { method: "POST", manual: true });
  * run({ username: "foo" }); // → POST /users  JSON.stringify(body)
  *
@@ -15,9 +15,9 @@
  * const { run } = useApi((id: number) => `/users/${id}`, { method: "DELETE", manual: true });
  * run(123); // → DELETE /users/123
  *
- * @example // 动态路径 + 带 body
+ * @example // 动态路径 + 带请求体
  * const { run } = useApi((id: number) => `/users/${id}`, { method: "PATCH", manual: true });
- * run(123, { status: "disabled" }); // → PATCH /users/123  body: JSON.stringify({status:"disabled"})
+ * run(123, { status: "disabled" }); // → PATCH /users/123  请求体: JSON.stringify({status:"disabled"})
  */
 import { useRequest } from "ahooks";
 import type { Options } from "ahooks/lib/useRequest/src/types";
@@ -25,7 +25,7 @@ import { apiFetch } from "./api";
 
 type ApiPathFn<TParams extends any[] = any[]> = (...args: TParams) => string;
 
-/** 非 GET 方法时允许末尾多传一个 body 参数 */
+/** 非 GET 方法时允许末尾多传一个请求体参数 */
 type FullParams<M extends string, TPathParams extends any[]> = M extends "GET"
   ? TPathParams
   : [...TPathParams, unknown?];
@@ -45,7 +45,7 @@ export function useApi<
   return useRequest(
     async (...args: FullParams<M, TPathParams>) => {
       // 计算最终路径
-      // 非 GET 时，仅当最后一个参数是普通对象（非数组）时才视为 body
+      // 非 GET 时，仅当最后一个参数是普通对象（非数组）时才视为请求体
       const lastArg = args[args.length - 1];
       const hasBody =
         method !== "GET" &&
@@ -62,7 +62,7 @@ export function useApi<
           ? pathOrBuilder(...(pathParams as TPathParams))
           : pathOrBuilder;
 
-      // 非 GET 时，最后一个普通对象参数视为 request body
+      // 非 GET 时，最后一个普通对象参数视为请求体
       const fetchOptions: RequestInit = {};
       if (method !== "GET") {
         fetchOptions.method = method;

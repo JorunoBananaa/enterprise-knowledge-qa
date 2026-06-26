@@ -13,7 +13,7 @@ interface PromptPanelProps {
   endpoint: string;
   /** 提示说明文字 */
   description: string;
-  /** TextArea placeholder */
+  /** 文本域占位提示 */
   placeholder?: string;
 }
 

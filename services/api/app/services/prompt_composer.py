@@ -41,7 +41,7 @@ QUESTION_REWRITE_PROMPT = ChatPromptTemplate.from_messages(
 
 
 def compose_system_message_content(system_prompt: str | None) -> str:
-    """Build the system message content for grounded QA."""
+    """构建基于证据问答的系统消息内容。"""
     return "\n\n".join(
         block.strip()
         for block in [system_prompt, GROUNDING_POLICY]
@@ -76,7 +76,7 @@ def compose_user_message_content(
     context_chunks: list[dict[str, Any]],
     question: str,
 ) -> str:
-    """Build the human message content with preferences, evidence, and question."""
+    """构建包含偏好、证据和问题的用户消息内容。"""
     blocks: list[str] = []
     if user_prompt and user_prompt.strip():
         blocks.extend(["User answer preferences:", user_prompt.strip()])

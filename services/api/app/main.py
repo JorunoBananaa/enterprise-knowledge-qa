@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-import app.models  # noqa: F401  # register all models with Base.metadata
+import app.models  # noqa: F401  # 将所有模型注册到 Base.metadata
 from app.api.routes.auth import router as auth_router
 from app.api.routes.categories import router as categories_router
 from app.api.routes.documents import router as documents_router
@@ -18,8 +18,8 @@ from app.db.session import SessionLocal, engine
 
 
 def _seed_database() -> None:
-    """Create tables and seed MVP users + default category if missing."""
-    # Enable pgvector extension before creating tables that depend on VECTOR type
+    """创建数据表，并在缺失时写入 MVP 用户和默认分类。"""
+    # 创建依赖 VECTOR 类型的数据表前，先启用 pgvector 扩展
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
@@ -31,7 +31,7 @@ def _seed_database() -> None:
         from app.models.user import User, UserRole, UserStatus
         from app.models.category import KnowledgeCategory
 
-        # Seed MVP users
+        # 写入 MVP 用户
         if db.query(User).filter(User.username == "admin").first() is None:
             db.add(User(
                 username="admin",

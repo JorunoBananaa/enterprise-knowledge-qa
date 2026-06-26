@@ -77,7 +77,7 @@ function parseCategoryParam(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-// ── document table columns ──
+// ── 文档表格列 ──
 
 const columns: ColumnsType<Document> = [
   {
@@ -112,7 +112,7 @@ const columns: ColumnsType<Document> = [
   },
 ];
 
-// ── page ──
+// ── 页面入口 ──
 
 export default function LibraryPage() {
   return (
@@ -153,11 +153,11 @@ function LibraryPageContent() {
   const selectedCategory = parseCategoryParam(categoryParam);
   const [status, setStatus] = useState<string>();
 
-  // ── current user (for admin check) ──
+  // ── 当前用户（用于管理员判断） ──
   const { data: user } = useRequest(getCurrentUser);
   const isAdmin = user?.role === "admin";
 
-  // ── fetch documents ──
+  // ── 获取文档列表 ──
   const {
     data: docsData,
     loading: docsLoading,
@@ -173,7 +173,7 @@ function LibraryPageContent() {
     { refreshDeps: [selectedCategory, status] },
   );
 
-  // ── delete document ──
+  // ── 删除文档 ──
   const { loading: deleting, run: doDeleteDoc } = useApi(
     (id: number) => `/documents/${id}`,
     {
@@ -191,7 +191,7 @@ function LibraryPageContent() {
     },
   );
 
-  // ── document table columns (with actions) ──
+  // ── 文档表格列（含操作） ──
   const tableColumns: ColumnsType<Document> = useMemo(
     () => [
       ...columns,
@@ -231,7 +231,7 @@ function LibraryPageContent() {
   const docs = displayData?.items ?? [];
   const total = displayData?.total ?? 0;
 
-  // ── fetch categories ──
+  // ── 获取分类列表 ──
   const {
     data: catData,
     loading: catLoading,
@@ -245,7 +245,7 @@ function LibraryPageContent() {
     [categories],
   );
 
-  // ── category CRUD modal ──
+  // ── 分类增删改弹窗 ──
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editingCatId, setEditingCatId] = useState<number | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<number | null>(null);
@@ -261,7 +261,7 @@ function LibraryPageContent() {
     [catForm],
   );
 
-  // ── upload modal ──
+  // ── 上传弹窗 ──
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadCategoryId, setUploadCategoryId] = useState<number | null>(null);
@@ -384,7 +384,7 @@ function LibraryPageContent() {
     },
   });
 
-  // ── tree node action menu ──
+  // ── 树节点操作菜单 ──
   const getNodeMenuItems = useCallback(
     (node: CatTreeNode) => [
       {
@@ -505,7 +505,7 @@ function LibraryPageContent() {
       />
 
       <div className="flex gap-5 items-start">
-        {/* ── left: category tree ── */}
+        {/* ── 左侧：分类树 ── */}
         <Card
           className="shrink-0 overflow-hidden"
           styles={{ body: { padding: "12px 8px 8px", overflow: "hidden" } }}
@@ -554,7 +554,7 @@ function LibraryPageContent() {
           )}
         </Card>
 
-        {/* ── right: document list ── */}
+        {/* ── 右侧：文档列表 ── */}
         {selectedCategory != null ? (
           <div className="flex-1 min-w-0">
             <Card className="!mb-4" styles={{ body: { padding: "12px 16px" } }}>
@@ -615,7 +615,7 @@ function LibraryPageContent() {
         )}
       </div>
 
-      {/* ── upload modal ── */}
+      {/* ── 上传弹窗 ── */}
       <Modal
         title="上传文档"
         open={uploadModalOpen}
@@ -683,7 +683,7 @@ function LibraryPageContent() {
         </Spin>
       </Modal>
 
-      {/* ── category modal ── */}
+      {/* ── 分类弹窗 ── */}
       <Modal
         title={editingCatId != null ? "编辑分类" : "新建分类"}
         open={catModalOpen}

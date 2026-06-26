@@ -5,7 +5,7 @@ from app.models.prompt import UserPrompt
 
 
 def get_system_prompt_content() -> str:
-    """Return the active system prompt content, or empty string."""
+    """返回活跃的系统提示词内容；没有则返回空字符串。"""
     db = SessionLocal()
     try:
         from app.models.prompt import PromptStatus, PromptTemplate
@@ -22,16 +22,16 @@ def get_system_prompt_content() -> str:
 
 
 def upsert_system_prompt(content: str, author_id: int) -> None:
-    """Set the system prompt content. Deactivates old, creates new active."""
+    """设置系统提示词内容；停用旧版本并创建新的活跃版本。"""
     from app.models.prompt import PromptStatus, PromptTemplate
 
     db = SessionLocal()
     try:
-        # Deactivate all
+        # 停用全部旧版本
         db.query(PromptTemplate).filter(
             PromptTemplate.status == PromptStatus.ACTIVE
         ).update({"status": PromptStatus.ARCHIVED})
-        # Get next version
+        # 获取下一个版本号
         latest = (
             db.query(PromptTemplate)
             .order_by(PromptTemplate.version.desc())
@@ -51,7 +51,7 @@ def upsert_system_prompt(content: str, author_id: int) -> None:
 
 
 def get_user_prompt(user_id: int) -> str:
-    """Return the user's personal prompt content, or empty string."""
+    """返回用户的个人提示词内容；没有则返回空字符串。"""
     db = SessionLocal()
     try:
         up = db.query(UserPrompt).filter(UserPrompt.user_id == user_id).first()
@@ -61,7 +61,7 @@ def get_user_prompt(user_id: int) -> str:
 
 
 def upsert_user_prompt(user_id: int, content: str) -> None:
-    """Create or update the user's personal prompt."""
+    """创建或更新用户的个人提示词。"""
     db = SessionLocal()
     try:
         up = db.query(UserPrompt).filter(UserPrompt.user_id == user_id).first()

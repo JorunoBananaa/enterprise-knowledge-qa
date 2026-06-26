@@ -26,7 +26,7 @@ router = APIRouter()
 def get_system_prompt(
     _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> SystemPromptResponse:
-    """Get current system prompt content (admin only)."""
+    """获取当前系统提示词内容（仅管理员）。"""
     return SystemPromptResponse(content=get_system_prompt_content())
 
 
@@ -35,7 +35,7 @@ def update_system_prompt(
     payload: SystemPromptUpdate,
     admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> SystemPromptResponse:
-    """Update system prompt content (admin only)."""
+    """更新系统提示词内容（仅管理员）。"""
     upsert_system_prompt(content=payload.content, author_id=admin.id)
     return SystemPromptResponse(content=payload.content)
 
@@ -44,7 +44,7 @@ def update_system_prompt(
 def get_my_prompt(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> UserPromptResponse:
-    """Get the current user's personal prompt."""
+    """获取当前用户的个人提示词。"""
     return UserPromptResponse(content=get_user_prompt(current_user.id))
 
 
@@ -53,6 +53,6 @@ def update_my_prompt(
     payload: UserPromptUpdate,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> UserPromptResponse:
-    """Update the current user's personal prompt."""
+    """更新当前用户的个人提示词。"""
     upsert_user_prompt(user_id=current_user.id, content=payload.content)
     return UserPromptResponse(content=payload.content)

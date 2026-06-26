@@ -77,17 +77,17 @@ def create_chat_model(
     base_url: str | None = None,
     temperature: float = 0.0,
 ) -> BaseChatModel:
-    """Create a LangChain chat model instance from provider configuration.
+    """根据提供商配置创建 LangChain 聊天模型实例。
 
-    Args:
-        provider:  One of SUPPORTED_PROVIDERS (e.g. "deepseek", "openai").
-        model_name: Model identifier (e.g. "deepseek-chat", "gpt-4o").
-        api_key:    API key or token.
-        base_url:   Override the default base URL (optional).
-        temperature: Sampling temperature (0 = deterministic).
+    参数：
+        provider: SUPPORTED_PROVIDERS 中的提供商键，例如 "deepseek"、"openai"。
+        model_name: 模型标识，例如 "deepseek-chat"、"gpt-4o"。
+        api_key: API key 或 token。
+        base_url: 覆盖默认 base URL（可选）。
+        temperature: 采样温度，0 表示确定性输出。
 
-    Returns:
-        A LangChain BaseChatModel instance ready for `.invoke()`.
+    返回：
+        可直接调用 `.invoke()` 的 LangChain BaseChatModel 实例。
     """
     if provider not in _PROVIDER_REGISTRY:
         raise ValueError(f"Unsupported LLM provider: {provider}. Supported: {SUPPORTED_PROVIDERS}")

@@ -20,7 +20,7 @@ def save_upload(file: UploadFile) -> str:
 
 
 def delete_upload(file_path: str) -> None:
-    """Delete an uploaded file from disk, silently ignore if not found."""
+    """从磁盘删除已上传文件；文件不存在时静默忽略。"""
     try:
         p = Path(file_path)
         if p.exists():

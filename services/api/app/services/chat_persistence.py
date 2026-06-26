@@ -21,11 +21,11 @@ def is_new_session(
     *,
     session: ChatSession,
 ) -> bool:
-    """Return True when the session has no metadata name and no messages yet.
+    """当会话没有标题且没有消息时返回 True。
 
-    A session is considered "new" only if both conditions hold:
-    - Its title is empty (None or blank string).
-    - Its message queue is empty.
+    只有同时满足以下条件，才认为会话是“新会话”：
+    - 标题为空（None 或空白字符串）。
+    - 消息队列为空。
     """
     if session.title:
         return False

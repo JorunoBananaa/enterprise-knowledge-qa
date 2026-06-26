@@ -94,7 +94,7 @@ function createRequestId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-// ── component ────────────────────────────────────────────────────────
+// ── 组件入口 ────────────────────────────────────────────────────────
 
 export default function QAPage() {
   const searchParams = useSearchParams();
@@ -152,7 +152,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     new Map<string, boolean>(),
   );
 
-  // ── scope selection ──
+  // ── 范围选择 ──
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scopeCategoryIds, setScopeCategoryIds] = useState<number[]>([]);
   const [scopeDocumentIds, setScopeDocumentIds] = useState<number[]>([]);
@@ -160,11 +160,11 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     null,
   );
 
-  // ── computed scope state ──
+  // ── 范围派生状态 ──
   const scopeTotal = scopeCategoryIds.length + scopeDocumentIds.length;
   const scopeLabel = scopeTotal === 0 ? "全部知识库" : `已选 ${scopeTotal} 项`;
 
-  // ── chat provider ──
+  // ── 聊天提供器 ──
   const provider = useMemo(
     () => getQAChatProvider(conversationKey),
     [conversationKey],
@@ -253,11 +253,11 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     [normalizedChatMessageInfos],
   );
 
-  // ── load session list ──
+  // ── 加载会话列表 ──
   const { data: sessions = [], run: loadSessions } =
     useApi<SessionItem[]>("/qa/sessions");
 
-  // ── fork session ──
+  // ── 创建会话分支 ──
   const { runAsync: forkSession } = useApi<
     ForkSessionResponse,
     [number],
@@ -267,7 +267,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     manual: true,
   });
 
-  // ── load LLM configs ──
+  // ── 加载大模型配置 ──
   const { data: llmConfigs = [] } = useApi<LLMConfigBrief[]>(
     "/llm-configs/brief",
     {
@@ -286,7 +286,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     [llmConfigs],
   );
 
-  // ── load categories for scope drawer ──
+  // ── 为范围抽屉加载分类 ──
   const { data: catData } = useApi<{ items: CategoryItem[] }>("/categories");
   const categories = catData?.items ?? [];
   const catTree = useMemo(() => buildCatTree(categories), [categories]);
@@ -299,7 +299,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     [scopeCategoryIds],
   );
 
-  // ── documents in active drawer category ──
+  // ── 当前抽屉分类下的文档 ──
   const { data: scopeDocsData } = useRequest(
     async () => {
       if (activeDrawerCatId == null) return EMPTY_DOCUMENTS;
@@ -362,7 +362,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     });
   }, [activeId, conversationKey, loadSessions, streamedSessionId]);
 
-  // ── ask question (streaming) ────────────────────────────────────
+  // ── 提问（流式响应） ────────────────────────────────────────
 
   const handleAsk = useCallback(
     (msg?: string, editMessageId?: number | null) => {
@@ -469,7 +469,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     routeConversationKey,
   ]);
 
-  // ── auto-scroll to bottom (throttled) ──────────────────────────
+  // ── 自动滚动到底部（节流） ─────────────────────────────────
 
   const scrollToBottom = useMemo(
     () =>
@@ -543,7 +543,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
     setScopeDocumentIds([]);
   }, []);
 
-  // ── derived state ────────────────────────────────────────────────
+  // ── 派生状态 ───────────────────────────────────────────────
 
   const sessionMap = useMemo(
     () => new Map(sessions.map((s): [number, SessionItem] => [s.id, s])),
@@ -556,7 +556,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   const questionBorderRadius = `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px ${token.borderRadiusLG}px`;
   const answerBorderRadius = `${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadiusLG}px ${token.borderRadius}px`;
 
-  // ── render ───────────────────────────────────────────────────────
+  // ── 渲染 ───────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col overflow-hidden h-screen border-0 rounded-none bg-app-bg shadow-none px-8 py-7 box-border">

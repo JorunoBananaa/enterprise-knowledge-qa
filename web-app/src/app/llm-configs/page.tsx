@@ -124,7 +124,7 @@ export default function LLMConfigPage() {
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
-  // ── fetch configs ──
+  // ── 获取配置列表 ──
   const {
     data: configs = [],
     loading,
@@ -166,7 +166,7 @@ export default function LLMConfigPage() {
     }
   }, [form]);
 
-  // ── submit (create / edit) ──
+  // ── 提交（新建 / 编辑） ──
   const onMutateSuccess = () => {
     setModalOpen(false);
     message.success(editingId != null ? "配置已更新" : "配置已创建");
@@ -212,7 +212,7 @@ export default function LLMConfigPage() {
     }
   };
 
-  // ── activate ──
+  // ── 启用配置 ──
   const { run: handleActivate } = useApi(
     (id: number) => `/llm-configs/${id}/activate`,
     {
@@ -236,7 +236,7 @@ export default function LLMConfigPage() {
     handleActivate(id);
   }, [handleActivate]);
 
-  // ── test connectivity ──
+  // ── 连通性测试 ──
   const { run: runTest } = useApi(
     (id: number) => `/llm-configs/${id}/test`,
     {
@@ -259,7 +259,7 @@ export default function LLMConfigPage() {
     runTest(id);
   }, [runTest]);
 
-  // ── delete ──
+  // ── 删除配置 ──
   const { run: handleDelete } = useApi((id: number) => `/llm-configs/${id}`, {
     method: "DELETE",
     manual: true,

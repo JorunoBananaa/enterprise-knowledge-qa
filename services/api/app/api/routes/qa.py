@@ -108,7 +108,7 @@ def _resolve_session(
     question: str,
     db: Session,
 ) -> ChatSession:
-    """Resolve or create a chat session."""
+    """解析或创建聊天会话。"""
     if session_id is not None:
         session = (
             db.query(ChatSession)
@@ -135,7 +135,7 @@ def _resolve_session(
 
 
 def _resolve_llm(llm_config_id: int | None) -> Any:
-    """Resolve LLM from config; raises if no valid LLM is configured."""
+    """根据配置解析 LLM；没有有效配置时抛出异常。"""
     if llm_config_id is not None and llm_config_id > 0:
         cfg = get_llm_config(llm_config_id)
         if cfg is None:
@@ -150,7 +150,7 @@ def _resolve_llm(llm_config_id: int | None) -> Any:
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
-    # llm_config_id is None → use active config
+    # llm_config_id 为 None 时使用活跃配置
     active = get_active_llm_config()
     if active is None:
         raise HTTPException(
@@ -169,7 +169,7 @@ def _resolve_llm(llm_config_id: int | None) -> Any:
 
 
 def _resolve_prompts(user_id: int) -> tuple[str | None, str | None]:
-    """Resolve configured system prompt and user answer preferences."""
+    """解析已配置的系统提示词和用户回答偏好。"""
     system_prompt = get_system_prompt_content().strip() or None
     user_prompt = get_user_prompt(user_id).strip() or None
     return system_prompt, user_prompt
@@ -180,7 +180,7 @@ def _load_chat_history(
     db: Session,
     limit: int = CHAT_HISTORY_LIMIT,
 ) -> list[dict[str, str]]:
-    """Load recent session turns in chronological order."""
+    """按时间顺序加载最近的会话轮次。"""
     rows = (
         db.query(ChatMessage)
         .filter(ChatMessage.session_id == session_id)
@@ -200,10 +200,10 @@ def _truncate_session_from_message(
     session_id: int,
     edit_message_id: int,
 ) -> None:
-    """Delete the target message and all subsequent messages in the session.
+    """删除会话中的目标消息及其后的所有消息。
 
-    Used by the edit-question flow: the edited question and its answer (and
-    every message after it) are removed so a fresh answer can be regenerated.
+    用于编辑问题流程：移除被编辑的问题及其回答（以及后续所有消息），
+    以便重新生成新的回答。
     """
     target = (
         db.query(ChatMessage)
@@ -216,7 +216,7 @@ def _truncate_session_from_message(
     if target is None:
         raise HTTPException(status_code=404, detail="编辑的消息不存在")
 
-    # Select messages at or after the target (by created_at, then id)
+    # 选择目标消息及其后的消息（按 created_at 和 id 判断顺序）
     messages_to_delete = (
         db.query(ChatMessage)
         .filter(ChatMessage.session_id == session_id)
@@ -241,7 +241,7 @@ def _truncate_session_from_message(
 
 
 def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
-    """Given a list of category IDs, return all IDs including descendants."""
+    """给定分类 ID 列表，返回包含所有子孙分类在内的 ID。"""
     all_cats = db.query(KnowledgeCategory).all()
     children_map: dict[int, list[int]] = {}
     for c in all_cats:
@@ -260,7 +260,7 @@ def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
 
 
 def _build_category_path_map(db: Session) -> dict[int, str]:
-    """Build display paths for all knowledge categories."""
+    """构建所有知识分类的展示路径。"""
     categories = db.query(KnowledgeCategory).all()
     category_by_id = {category.id: category for category in categories}
 
@@ -290,9 +290,9 @@ def _resolve_target_document_ids(
     category_ids: list[int] | None,
     document_ids: list[int] | None,
 ) -> list[int] | None:
-    """Resolve the set of document IDs for retrieval filtering.
+    """解析用于检索过滤的文档 ID 集合。
 
-    Returns None if no filtering is needed (search all documents).
+    如果无需过滤（检索所有文档），返回 None。
     """
     has_filter = bool(category_ids) or bool(document_ids)
     if not has_filter:
@@ -316,7 +316,7 @@ def _resolve_target_document_ids(
 
 
 def _compute_query_embedding(question: str) -> list[float]:
-    """Compute the query embedding (synchronous, may load model weights)."""
+    """计算查询 embedding（同步执行，可能加载模型权重）。"""
     provider = settings.embedding_provider
 
     if provider in ("huggingface", "ollama"):
@@ -329,7 +329,7 @@ def _compute_query_embedding(question: str) -> list[float]:
             **kwargs,
         )
     else:
-        # Remote providers need an active LLM config for the API key
+        # 远程提供商需要活跃的 LLM 配置来获取 API key
         active_cfg = get_active_llm_config()
         if active_cfg is None:
             raise HTTPException(
@@ -352,17 +352,14 @@ async def _retrieve_chunks(
     top_k: int = 5,
     target_document_ids: list[int] | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve the most relevant document chunks via pgvector ANN search.
+    """通过 pgvector ANN 搜索检索最相关的文档块。
 
-    Generates an embedding for the question, then performs cosine similarity
-    search against the document_chunks table.
+    先为问题生成 embedding，再在 document_chunks 表中执行余弦相似度搜索。
 
-    When `target_document_ids` is provided, only chunks belonging to those
-    documents are considered.
+    当提供 `target_document_ids` 时，只检索这些文档下的块。
 
-    The embedding computation runs in a worker thread so that a slow model
-    load / inference does not block the event loop (which would starve
-    concurrent requests such as POST /sessions).
+    embedding 计算放在工作线程中执行，避免缓慢的模型加载或推理阻塞事件循环，
+    否则 POST /sessions 等并发请求可能得不到调度。
     """
     if target_document_ids == []:
         return []
@@ -403,14 +400,14 @@ async def _retrieve_chunks(
     ]
 
 
-# ── Sessions ──────────────────────────────────────────────────────────
+# ── 会话 ──────────────────────────────────────────────────────────
 
 @router.get("/sessions", response_model=list[ChatSessionOut])
 def list_sessions(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[ChatSessionOut]:
-    """List all sessions belonging to the current user (newest first)."""
+    """列出当前用户的所有会话（最新优先）。"""
     user_id = str(current_user.id)
     sessions = (
         db.query(ChatSession)
@@ -441,7 +438,7 @@ def create_session(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ChatSessionOut:
-    """Create an empty chat session for starting a new conversation."""
+    """创建空聊天会话，用于开始新对话。"""
     session = persist_new_chat_session(
         db,
         user_id=str(current_user.id),
@@ -461,7 +458,7 @@ def get_session(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ChatSessionDetail:
-    """Get a single session with all its messages."""
+    """获取单个会话及其全部消息。"""
     user_id = str(current_user.id)
     session = (
         db.query(ChatSession)
@@ -542,7 +539,7 @@ def delete_session(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
-    """Delete a session and all its messages."""
+    """删除会话及其全部消息。"""
     user_id = str(current_user.id)
     session = (
         db.query(ChatSession)
@@ -552,7 +549,7 @@ def delete_session(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
-    # Delete citations then messages (citations FK to messages)
+    # 先删除引用，再删除消息（引用通过外键关联消息）
     message_ids = [
         m.id
         for m in db.query(ChatMessage.id)
@@ -573,7 +570,7 @@ def fork_message(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ForkSessionResponse:
-    """Fork a chat session at a completed message."""
+    """基于一条已完成消息分叉聊天会话。"""
     try:
         new_session = fork_chat_session_at_message(
             db,
@@ -586,7 +583,7 @@ def fork_message(
     return ForkSessionResponse(session_id=new_session.id)
 
 
-# ── Ask (streaming) ───────────────────────────────────────────────────
+# ── 提问（流式） ───────────────────────────────────────────────────
 
 
 @router.post("/ask/cancel")
@@ -594,7 +591,7 @@ async def cancel_question_stream(
     payload: AskCancelRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> dict[str, bool]:
-    """Cancel an in-flight streaming answer for the current process."""
+    """取消当前进程中正在进行的流式回答。"""
     del current_user
 
     state = _ASK_CANCEL_STATES.get(payload.request_id)
@@ -615,9 +612,9 @@ async def ask_question_stream(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """Ask a question with SSE streaming response.
+    """以 SSE 流式响应提问。
 
-    Events:
+    事件：
         session → {"session_id": …}
         chunk   → {"text": "…"}
         citation → {"document_id": …, "document_name": …, "document_path": …, "chunk_id": …, "locator": …}
@@ -672,7 +669,7 @@ async def ask_question_stream(
             _unregister_ask_cancel_state(payload.request_id, cancel_state)
             return _empty_stream_response()
 
-        # Build LLM synchronously
+        # 同步构建 LLM
         try:
             llm = _resolve_llm(payload.llm_config_id)
         except HTTPException:
@@ -685,7 +682,7 @@ async def ask_question_stream(
             _unregister_ask_cancel_state(payload.request_id, cancel_state)
             return _empty_stream_response()
 
-        # Resolve scope filtering (categories → document IDs)
+        # 解析范围过滤（分类 → 文档 ID）
         target_document_ids = _resolve_target_document_ids(
             db, payload.category_ids, payload.document_ids,
         )
@@ -703,7 +700,7 @@ async def ask_question_stream(
             _unregister_ask_cancel_state(payload.request_id, cancel_state)
             return _empty_stream_response()
 
-        # Retrieve relevant chunks via pgvector ANN search (scoped)
+        # 通过 pgvector ANN 搜索检索相关块（带范围过滤）
         retrieved_chunks = await _retrieve_chunks(
             retrieval_question, db, target_document_ids=target_document_ids,
         )

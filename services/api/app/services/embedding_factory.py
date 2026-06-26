@@ -1,13 +1,13 @@
 """
-Embedding Factory – creates LangChain embedding model instances.
+Embedding 工厂 —— 创建 LangChain embedding 模型实例。
 
-Supported providers:
+支持的提供商：
 - openai      → OpenAIEmbeddings
-- deepseek    → OpenAIEmbeddings (OpenAI-compatible, base_url=https://api.deepseek.com/v1)
-- zhipu       → OpenAIEmbeddings (OpenAI-compatible, base_url=https://open.bigmodel.cn/api/paas/v4/)
-- qwen        → OpenAIEmbeddings (OpenAI-compatible, via DashScope)
-- huggingface → HuggingFaceEmbeddings (local, no API key needed)
-- ollama      → OpenAIEmbeddings (OpenAI-compatible, local Ollama, base_url=http://localhost:11434/v1)
+- deepseek    → OpenAIEmbeddings（OpenAI 兼容，base_url=https://api.deepseek.com/v1）
+- zhipu       → OpenAIEmbeddings（OpenAI 兼容，base_url=https://open.bigmodel.cn/api/paas/v4/）
+- qwen        → OpenAIEmbeddings（OpenAI 兼容，通过 DashScope）
+- huggingface → HuggingFaceEmbeddings（本地运行，无需 API key）
+- ollama      → OpenAIEmbeddings（OpenAI 兼容，本地 Ollama，base_url=http://localhost:11434/v1）
 """
 
 import threading
@@ -18,11 +18,11 @@ from langchain_openai import OpenAIEmbeddings
 
 
 class _OllamaEmbeddings(OpenAIEmbeddings):
-    """OpenAIEmbeddings wrapper for Ollama's single-string /v1/embeddings.
+    """适配 Ollama 单字符串 /v1/embeddings 的 OpenAIEmbeddings 包装类。
 
-    Ollama only accepts ``{"input": "a single string"}`` — the standard
-    OpenAIEmbeddings.embed_documents() sends a JSON array, which fails
-    with "invalid input type".  This subclass sends one request per text.
+    Ollama 只接受 ``{"input": "a single string"}``；标准
+    OpenAIEmbeddings.embed_documents() 会发送 JSON 数组，并因
+    "invalid input type" 失败。该子类会为每段文本分别发送一次请求。
     """
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -31,7 +31,7 @@ class _OllamaEmbeddings(OpenAIEmbeddings):
             for t in texts
         ]
 
-# ── Provider → (Embeddings class, default_base_url) ──────────────────
+# ── 提供商 → (Embeddings 类, 默认 base_url) ──────────────────
 
 _EMBEDDING_REGISTRY: dict[str, tuple[str, str | None]] = {
     "openai":      ("OpenAIEmbeddings", None),
@@ -44,13 +44,12 @@ _EMBEDDING_REGISTRY: dict[str, tuple[str, str | None]] = {
 
 SUPPORTED_EMBEDDING_PROVIDERS = sorted(_EMBEDDING_REGISTRY.keys())
 
-# Module-level cache for Embeddings instances.
+# Embeddings 实例的模块级缓存。
 #
-# HuggingFaceEmbeddings loads model weights into memory on construction,
-# which can take several seconds. Constructing a fresh instance on every
-# request blocks the event loop (ask_question_stream is an async def) and
-# starves concurrent requests such as POST /sessions. Caching the instance
-# per (provider, model_name, api_key, base_url) avoids the repeated reload.
+# HuggingFaceEmbeddings 在构造时会把模型权重加载到内存中，
+# 这个过程可能耗时数秒。每次请求都创建新实例会阻塞事件循环
+#（ask_question_stream 是 async def），导致 POST /sessions 等并发请求
+# 得不到调度。按 (provider, model_name, api_key, base_url) 缓存实例可避免重复加载。
 _EMBEDDING_CACHE: dict[str, Embeddings] = {}
 _EMBEDDING_CACHE_LOCK = threading.Lock()
 
@@ -61,13 +60,13 @@ def _instantiate_embeddings(
     api_key: str,
     base_url: str | None,
 ) -> Embeddings:
-    """Create a brand-new Embeddings instance (slow: may load model weights)."""
+    """创建全新的 Embeddings 实例（较慢，可能加载模型权重）。"""
     cls_name, default_base = _EMBEDDING_REGISTRY[provider]
     resolved_base = base_url or default_base
 
     if cls_name == "OpenAIEmbeddings":
-        # Ollama runs locally and does not require an API key, but the
-        # OpenAI client rejects an empty string.  Provide a dummy value.
+        # Ollama 本地运行且不需要 API key，但 OpenAI 客户端拒绝空字符串，
+        # 因此提供一个占位值。
         resolved_api_key = api_key or ("ollama" if provider == "ollama" else "")
 
         kwargs: dict[str, Any] = {
@@ -77,8 +76,8 @@ def _instantiate_embeddings(
         if resolved_base:
             kwargs["base_url"] = resolved_base
 
-        # Ollama /v1/embeddings only accepts single-string input.
-        # _OllamaEmbeddings overrides embed_documents() to batch one-by-one.
+        # Ollama /v1/embeddings 只接受单字符串输入。
+        # _OllamaEmbeddings 覆盖 embed_documents()，逐条批处理。
         if provider == "ollama":
             return _OllamaEmbeddings(**kwargs)
 
@@ -101,17 +100,17 @@ def create_embeddings(
     api_key: str = "",
     base_url: str | None = None,
 ) -> Embeddings:
-    """Create (or reuse a cached) LangChain Embeddings instance.
+    """创建或复用缓存的 LangChain Embeddings 实例。
 
-    Args:
-        provider:   One of SUPPORTED_EMBEDDING_PROVIDERS.
-        model_name: Embedding model identifier (e.g. "text-embedding-ada-002" for OpenAI,
-                    "sentence-transformers/all-mpnet-base-v2" for HuggingFace).
-        api_key:    API key or token (not needed for huggingface).
-        base_url:   Override the default base URL.
+    参数：
+        provider: SUPPORTED_EMBEDDING_PROVIDERS 中的提供商键。
+        model_name: Embedding 模型标识，例如 OpenAI 的 "text-embedding-ada-002"，
+                    或 HuggingFace 的 "sentence-transformers/all-mpnet-base-v2"。
+        api_key: API key 或 token（huggingface 不需要）。
+        base_url: 覆盖默认 base URL。
 
-    Returns:
-        A LangChain Embeddings instance.
+    返回：
+        LangChain Embeddings 实例。
     """
     if provider not in _EMBEDDING_REGISTRY:
         raise ValueError(
@@ -121,13 +120,12 @@ def create_embeddings(
 
     cache_key = f"{provider}:{model_name}:{api_key}:{base_url or ''}"
 
-    # Fast path: return cached instance without acquiring the lock.
+    # 快路径：不获取锁，直接返回缓存实例。
     cached = _EMBEDDING_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    # Slow path: instantiate (may take seconds) under a lock so we don't
-    # build duplicate instances for the same key concurrently.
+    # 慢路径：在锁内实例化（可能耗时数秒），避免并发为同一个 key 构造重复实例。
     with _EMBEDDING_CACHE_LOCK:
         cached = _EMBEDDING_CACHE.get(cache_key)
         if cached is not None:

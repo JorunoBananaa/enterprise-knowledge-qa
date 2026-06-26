@@ -26,7 +26,7 @@ from app.services.llm_factory import create_chat_model
 router = APIRouter()
 
 
-# ── List all configs (admin only) ─────────────────────────────────────
+# ── 列出全部配置（仅管理员） ─────────────────────────────────────
 
 @router.get("", response_model=list[LLMConfigResponse])
 def list_configs(
@@ -36,7 +36,7 @@ def list_configs(
     return [LLMConfigResponse.from_orm_obj(c) for c in configs]
 
 
-# ── List brief configs (any authenticated user – for dropdown) ────────
+# ── 列出简要配置（任意登录用户，用于下拉选择） ────────
 
 @router.get("/brief", response_model=list[LLMConfigBrief])
 def list_configs_brief(
@@ -46,7 +46,7 @@ def list_configs_brief(
     return [LLMConfigBrief.from_orm_obj(c) for c in configs]
 
 
-# ── Create ────────────────────────────────────────────────────────────
+# ── 创建 ────────────────────────────────────────────────────────────
 
 @router.post("", response_model=LLMConfigResponse, status_code=status.HTTP_201_CREATED)
 def create(
@@ -63,7 +63,7 @@ def create(
     return LLMConfigResponse.from_orm_obj(cfg)
 
 
-# ── Update ────────────────────────────────────────────────────────────
+# ── 更新 ────────────────────────────────────────────────────────────
 
 @router.patch("/{config_id}", response_model=LLMConfigResponse)
 def update(
@@ -71,7 +71,7 @@ def update(
     payload: LLMConfigUpdate,
     _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
-    # Snapshot current values for partial update
+    # 快照当前值，用于部分更新
     current = get_llm_config(config_id)
     if current is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")
@@ -83,7 +83,7 @@ def update(
     return LLMConfigResponse.from_orm_obj(cfg)
 
 
-# ── Activate ──────────────────────────────────────────────────────────
+# ── 激活 ──────────────────────────────────────────────────────────
 
 @router.post("/{config_id}/activate", response_model=LLMConfigResponse)
 def activate(
@@ -96,14 +96,14 @@ def activate(
     return LLMConfigResponse.from_orm_obj(cfg)
 
 
-# ── Test connectivity ─────────────────────────────────────────────────
+# ── 测试连通性 ─────────────────────────────────────────────────
 
 @router.post("/{config_id}/test")
 def test_connectivity(
     config_id: int,
     _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> dict:
-    """Send a minimal ping to verify the LLM API is reachable and the key works."""
+    """发送最小 ping，验证 LLM API 可访问且 key 可用。"""
     cfg = get_llm_config(config_id)
     if cfg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")
@@ -126,7 +126,7 @@ def test_connectivity(
     return {"ok": True, "message": "连通性正常"}
 
 
-# ── Delete ────────────────────────────────────────────────────────────
+# ── 删除 ────────────────────────────────────────────────────────────
 
 @router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete(

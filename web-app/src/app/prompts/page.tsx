@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import PromptPanel from "@/components/PromptPanel";
 
-// ── Unified Prompt Page ──────────────────────────────────────────────
+// ── 统一提示词页面 ─────────────────────────────────────────────────
 
 export default function PromptsPage() {
   const { data: user = null, loading } = useRequest(getCurrentUser, {

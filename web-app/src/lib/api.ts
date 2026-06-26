@@ -83,7 +83,7 @@ export async function apiFetch<T = unknown>(
   return res.json();
 }
 
-// ── SSE streaming ──────────────────────────────────────────────────────
+// ── SSE 流式响应 ─────────────────────────────────────────────────────
 
 export type StreamEvent =
   | { type: "session"; session_id: number }
