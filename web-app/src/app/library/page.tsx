@@ -263,13 +263,13 @@ function LibraryPageContent() {
 
   // ── 上传弹窗 ──
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadCategoryId, setUploadCategoryId] = useState<number | null>(null);
   const [uploadForm] = Form.useForm();
 
   const openUploadModal = useCallback(
     (categoryId: number) => {
-      setUploadFile(null);
+      setUploadFiles([]);
       setUploadCategoryId(categoryId);
       uploadForm.resetFields();
       setUploadModalOpen(true);
@@ -295,29 +295,39 @@ function LibraryPageContent() {
     },
   });
 
-  const handleUploadSubmit = (values: { title: string }) => {
-    if (!uploadFile) {
+  const handleUploadSubmit = (values: { title?: string }) => {
+    if (uploadFiles.length === 0) {
       message.warning("请选择文件");
       return;
     }
+    if (uploadCategoryId == null) {
+      message.warning("请选择分类");
+      return;
+    }
     const formData = new FormData();
-    formData.append("title", values.title);
+    if (uploadFiles.length === 1 && values.title) {
+      formData.append("title", values.title);
+    }
     formData.append("category_id", String(uploadCategoryId));
-    formData.append("file", uploadFile);
+    uploadFiles.forEach((file) => {
+      formData.append("files", file);
+    });
     doUpload(formData);
   };
 
   const uploadDraggerProps: UploadProps = {
-    maxCount: 1,
-    beforeUpload: (file) => {
-      setUploadFile(file);
-      return false;
-    },
-    onRemove: () => setUploadFile(null),
+    multiple: true,
+    beforeUpload: () => false,
     onChange: (info) => {
-      if (info.file.name && !uploadForm.getFieldValue("title")) {
-        const nameWithoutExt = info.file.name.replace(/\.[^/.]+$/, "");
+      const nextFiles = info.fileList.flatMap((item) =>
+        item.originFileObj ? [item.originFileObj] : [],
+      );
+      setUploadFiles(nextFiles);
+      if (nextFiles.length === 1) {
+        const nameWithoutExt = nextFiles[0].name.replace(/\.[^/.]+$/, "");
         uploadForm.setFieldsValue({ title: nameWithoutExt });
+      } else {
+        uploadForm.setFieldsValue({ title: undefined });
       }
     },
     accept: ".pdf,.docx,.pptx,.xlsx",
@@ -633,7 +643,7 @@ function LibraryPageContent() {
             <Form.Item
               name="title"
               label="标题"
-              rules={[{ required: true, message: "请输入文档标题" }]}
+              extra="仅上传单个文件时生效；批量上传会使用文件名作为标题。"
             >
               <Input placeholder="请输入文档标题" />
             </Form.Item>
@@ -653,7 +663,7 @@ function LibraryPageContent() {
                 </p>
                 <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
                 <p className="ant-upload-hint">
-                  支持 PDF、Word、PPT、Excel 格式
+                  支持同时上传多个 PDF、Word、PPT、Excel 文件
                 </p>
               </Upload.Dragger>
             </Form.Item>
@@ -675,7 +685,11 @@ function LibraryPageContent() {
               <Space>
                 <Button onClick={() => setUploadModalOpen(false)}>取消</Button>
                 <Button type="primary" htmlType="submit" loading={uploading}>
-                  {uploading ? "上传中..." : "上传到知识库"}
+                  {uploading
+                    ? "上传中..."
+                    : uploadFiles.length > 1
+                      ? `上传 ${uploadFiles.length} 个文档`
+                      : "上传到知识库"}
                 </Button>
               </Space>
             </Form.Item>

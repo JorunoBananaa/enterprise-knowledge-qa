@@ -35,3 +35,7 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
     total: int
+
+
+class DocumentUploadResponse(BaseModel):
+    items: list[DocumentResponse]

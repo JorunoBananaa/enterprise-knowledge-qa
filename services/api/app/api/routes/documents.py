@@ -12,34 +12,64 @@ from app.repositories.documents import (
     list_documents,
 )
 from app.schemas.auth import CurrentUser
-from app.schemas.document import DocumentListResponse, DocumentResponse
+from app.schemas.document import DocumentListResponse, DocumentResponse, DocumentUploadResponse
 from app.services.storage import save_upload
 
 router = APIRouter()
 
 
+def _file_type(filename: str | None) -> str:
+    if not filename or "." not in filename:
+        return "unknown"
+    return filename.rsplit(".", 1)[-1]
+
+
+def _title_from_filename(filename: str | None) -> str:
+    if not filename:
+        return "未命名文档"
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return stem or filename
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def upload_document(
-    title: Annotated[str, Form()],
     category_id: Annotated[int, Form()],
-    file: Annotated[UploadFile, File()],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> DocumentResponse:
+    title: Annotated[str | None, Form()] = None,
+    file: Annotated[UploadFile | None, File()] = None,
+    files: Annotated[list[UploadFile] | None, File()] = None,
+) -> DocumentResponse | DocumentUploadResponse:
     """上传待审核文档。"""
-    storage_path = save_upload(file)
+    upload_files = [*list(files or [])]
+    if file is not None:
+        upload_files.append(file)
+    if not upload_files:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="请选择文件",
+        )
 
+    created_docs = []
     uploader_id = current_user.id
+    for upload_file in upload_files:
+        storage_path = save_upload(upload_file)
+        doc_title = title if len(upload_files) == 1 and title else _title_from_filename(upload_file.filename)
+        created_docs.append(
+            create_document(
+                {
+                    "title": doc_title,
+                    "file_type": _file_type(upload_file.filename),
+                    "storage_path": storage_path,
+                    "uploader_id": uploader_id,
+                    "category_id": category_id,
+                }
+            )
+        )
 
-    doc = create_document(
-        {
-            "title": title,
-            "file_type": file.filename.split(".")[-1] if file.filename else "unknown",
-            "storage_path": storage_path,
-            "uploader_id": uploader_id,
-            "category_id": category_id,
-        }
-    )
-    return DocumentResponse.from_orm_obj(doc)
+    responses = [DocumentResponse.from_orm_obj(doc) for doc in created_docs]
+    if len(responses) == 1 and file is not None and not files:
+        return responses[0]
+    return DocumentUploadResponse(items=responses)
 
 
 @router.get("")
