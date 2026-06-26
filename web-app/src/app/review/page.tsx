@@ -53,11 +53,9 @@ export default function ReviewPage() {
   const isActionLoading = (docId: number, action: ReviewAction) =>
     loadingActions.has(getActionKey(docId, action));
 
-  const {
-    data: docsData,
-    loading: docsLoading,
-    run: fetchDocs,
-  } = useApi<{ items: Document[] }>("/documents?review_status=pending_review");
+  const { data: docsData, loading: docsLoading } = useApi<{
+    items: Document[];
+  }>("/documents?review_status=pending_review");
   const docs = docsData?.items ?? [];
   const visibleDocs = docs.filter((doc) => !completedDocIds.has(doc.id));
   const initialLoading = docsLoading && docsData == null;
@@ -86,7 +84,6 @@ export default function ReviewPage() {
       await handleApprove(id);
       setCompletedDocIds((prev) => new Set(prev).add(id));
       message.success("文档已通过审核并完成索引");
-      fetchDocs();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "审核通过操作失败");
     } finally {
@@ -102,7 +99,6 @@ export default function ReviewPage() {
       await handleReject(id);
       setCompletedDocIds((prev) => new Set(prev).add(id));
       message.success("文档已驳回");
-      fetchDocs();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "驳回操作失败");
     } finally {
@@ -132,7 +128,10 @@ export default function ReviewPage() {
                     <Button
                       type="primary"
                       icon={<CheckOutlined />}
-                      loading={isActionLoading(doc.id, "approve")}
+                      loading={
+                        isActionLoading(doc.id, "approve") ||
+                        doc.index_status === "indexing"
+                      }
                       disabled={isActionLoading(doc.id, "reject")}
                       onClick={() => doApprove(doc.id)}
                     >
@@ -142,7 +141,10 @@ export default function ReviewPage() {
                       danger
                       icon={<CloseOutlined />}
                       loading={isActionLoading(doc.id, "reject")}
-                      disabled={isActionLoading(doc.id, "approve")}
+                      disabled={
+                        isActionLoading(doc.id, "approve") ||
+                        doc.index_status === "indexing"
+                      }
                       onClick={() => doReject(doc.id)}
                     >
                       驳回
