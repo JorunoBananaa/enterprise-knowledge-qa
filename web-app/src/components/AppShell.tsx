@@ -28,6 +28,7 @@ import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
 import { isNewSession } from "@/lib/utils";
+import { getLatestSession } from "@/app/qa/_lib/latest-session";
 import { pushCurrentSessionUrl } from "@/app/qa/_lib/session-url";
 
 const { Content } = Layout;
@@ -355,14 +356,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between px-[7px] pb-2.5 text-[#7b8492] text-xs font-semibold">
               <span>历史会话</span>
             </div>
-            <SessionHistoryBlock
-              conversations={qaConversations as QAConversationItem[]}
-              activeConversationKey={activeConversationKey}
-              loading={showSessionHistoryLoading}
-              onActiveConversationKeyChange={setActiveConversationKey}
-              onDeleteSession={handleDeleteSession}
-              onCurrentSessionIdChange={handleCurrentSessionIdChange}
-            />
+            <Suspense fallback={null}>
+              <SessionHistoryBlock
+                conversations={qaConversations as QAConversationItem[]}
+                activeConversationKey={activeConversationKey}
+                loading={showSessionHistoryLoading}
+                onActiveConversationKeyChange={setActiveConversationKey}
+                onDeleteSession={handleDeleteSession}
+                onCurrentSessionIdChange={handleCurrentSessionIdChange}
+              />
+            </Suspense>
           </div>
         </div>
 
@@ -398,10 +401,54 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             navigating ? "opacity-100 animate-nav-progress-slide" : ""
           }`}
         />
+        <Suspense fallback={null}>
+          <LatestQASessionRedirect
+            sessions={qaSessions}
+            loading={sessionsLoading}
+            onActiveConversationKeyChange={setActiveConversationKey}
+          />
+        </Suspense>
         <App>{children}</App>
       </Content>
     </Layout>
   );
+}
+
+interface LatestQASessionRedirectProps {
+  sessions: SessionItem[];
+  loading: boolean;
+  onActiveConversationKeyChange: (key: string) => boolean;
+}
+
+function LatestQASessionRedirect({
+  sessions,
+  loading,
+  onActiveConversationKeyChange,
+}: LatestQASessionRedirectProps) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const currentSessionId = searchParams.get("session_id");
+
+  useEffect(() => {
+    if (loading || currentSessionId) return;
+    if (pathname !== "/" && pathname !== "/qa") return;
+
+    const latestSession = getLatestSession(sessions);
+    if (!latestSession) return;
+
+    onActiveConversationKeyChange(String(latestSession.id));
+    router.replace(`/qa?session_id=${latestSession.id}`);
+  }, [
+    currentSessionId,
+    loading,
+    onActiveConversationKeyChange,
+    pathname,
+    router,
+    sessions,
+  ]);
+
+  return null;
 }
 
 // ── SessionHistoryBlock ──────────────────────────────────────────────
