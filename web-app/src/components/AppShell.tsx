@@ -27,6 +27,7 @@ import { useXConversations, type ConversationData } from "@ant-design/x-sdk";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
 import { getCurrentUser, logout, buildLoginUrl } from "@/lib/auth-client";
+import { isNewSession } from "@/lib/utils";
 import { pushCurrentSessionUrl } from "@/app/qa/_lib/session-url";
 
 const { Content } = Layout;
@@ -133,11 +134,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   });
   const handleCreateQaSession = useCallback(() => {
-    // 已存在未使用的"新会话"（标题为"新会话"且无消息）时直接跳转，不再新建
-    const existingNewSession = qaSessions.find(
-      (s) => (s.title || "新会话") === "新会话" && s.message_count === 0,
-    );
-    if (existingNewSession) {
+    // 已存在未使用的"新会话"（标题为空且无消息）时直接跳转，不再新建。
+    // 但如果该"新会话"就是用户当前正在查看的会话，则跳过复用逻辑，
+    // 否则 router.push 到相同 URL 会被 Next.js 忽略，导致按钮无响应。
+    const existingNewSession = qaSessions.find(isNewSession);
+    if (
+      existingNewSession &&
+      String(existingNewSession.id) !== currentSessionIdRef.current
+    ) {
       setActiveConversationKey(String(existingNewSession.id));
       router.push(`/qa?session_id=${existingNewSession.id}`);
       return;
@@ -205,6 +209,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const isQaPage = selectedKey === "/qa";
+  const showSessionHistoryLoading =
+    sessionsLoading && qaConversations.length === 0;
 
   // ── route transition progress bar ──
   const [navigating, setNavigating] = useState(false);
@@ -352,7 +358,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <SessionHistoryBlock
               conversations={qaConversations as QAConversationItem[]}
               activeConversationKey={activeConversationKey}
-              loading={sessionsLoading}
+              loading={showSessionHistoryLoading}
               onActiveConversationKeyChange={setActiveConversationKey}
               onDeleteSession={handleDeleteSession}
               onCurrentSessionIdChange={handleCurrentSessionIdChange}

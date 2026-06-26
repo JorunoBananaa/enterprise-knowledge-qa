@@ -445,7 +445,7 @@ def create_session(
     session = persist_new_chat_session(
         db,
         user_id=str(current_user.id),
-        title="新会话",
+        title=None,
     )
     return ChatSessionOut(
         id=session.id,

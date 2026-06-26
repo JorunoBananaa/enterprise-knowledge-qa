@@ -25,7 +25,7 @@ import { Sender, SenderProps } from "@ant-design/x";
 import { useXChat, type MessageInfo } from "@ant-design/x-sdk";
 import { useRequest } from "ahooks";
 import { useApi } from "@/lib/use-api";
-import { throttle } from "@/lib/utils";
+import { isNewSession, throttle } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import ChatMessageItem from "./_components/ChatMessageItem";
 import QAScopeDrawer from "./_components/QAScopeDrawer";
@@ -395,8 +395,12 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
       refreshAfterRequestByConversationRef.current.set(
         conversationKey,
         activeId !== null &&
-          (sessions.find((session) => session.id === activeId)?.title ||
-            "新会话") === "新会话",
+          isNewSession(
+            sessions.find((session) => session.id === activeId) ?? {
+              title: null,
+              message_count: 0,
+            },
+          ),
       );
 
       onRequest({

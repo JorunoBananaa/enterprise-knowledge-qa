@@ -9,7 +9,33 @@ from app.models.chat import ChatMessage, ChatSession, Citation
 
 
 def _first_line(text: str, max_len: int = 60) -> str:
-    """提取文本首行作为标题回退。"""
+    """提取文本首行作为标题，超出 max_len 则截断并加省略号。"""
+    line = text.split("\n", 1)[0].strip()
+    if len(line) <= max_len:
+        return line
+    return line[: max_len - 1] + "…"
+
+
+def is_new_session(
+    db: Any,
+    *,
+    session: ChatSession,
+) -> bool:
+    """Return True when the session has no metadata name and no messages yet.
+
+    A session is considered "new" only if both conditions hold:
+    - Its title is empty (None or blank string).
+    - Its message queue is empty.
+    """
+    if session.title:
+        return False
+
+    message_count = (
+        db.query(func.count(ChatMessage.id))
+        .filter(ChatMessage.session_id == session.id)
+        .scalar()
+    )
+    return message_count == 0
 
 
 def persist_new_chat_session(
@@ -34,15 +60,7 @@ def update_session_title_for_first_question(
     session: ChatSession,
     question: str,
 ) -> None:
-    if session.title != "新会话":
-        return
-
-    message_count = (
-        db.query(func.count(ChatMessage.id))
-        .filter(ChatMessage.session_id == session.id)
-        .scalar()
-    )
-    if message_count:
+    if not is_new_session(db, session=session):
         return
 
     session.title = _first_line(question)

@@ -16,6 +16,18 @@ export const omit = _omit;
 
 // ── 字符串工具 ───────────────────────────────────────────────
 
+// ── 会话工具 ─────────────────────────────────────────────────
+
+/** 判断是否为"新会话"：元数据名称为空，且没有消息记录 */
+export function isNewSession(session: {
+  title: string | null;
+  message_count: number;
+}): boolean {
+  return !session.title && session.message_count === 0;
+}
+
+// ── 字符串工具 ───────────────────────────────────────────────
+
 /** 脱敏展示：只保留前 head 位和后 tail 位 */
 export function maskString(
   str: string,
