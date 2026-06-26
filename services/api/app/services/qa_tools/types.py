@@ -17,3 +17,9 @@ class QaToolResult:
     name: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class QaToolPlan:
+    name: str
+    args: dict[str, Any] = field(default_factory=dict)

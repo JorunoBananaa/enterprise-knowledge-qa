@@ -42,7 +42,11 @@ from app.services.chat_persistence import (
 from app.services.llm_factory import create_chat_model
 from app.services.qa_orchestrator import QaStreamInput, stream_qa_events
 from app.services.qa_tools import QaToolContext
-from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
+from app.services.rag import (
+    answer_question_stream,
+    answer_tool_results_stream,
+    rewrite_question_for_retrieval,
+)
 
 router = APIRouter()
 
@@ -753,6 +757,7 @@ async def ask_question_stream(
                 rewrite_question=rewrite_question_for_retrieval,
                 retrieve_chunks=retrieve_chunks_for_graph,
                 answer_stream=answer_question_stream,
+                tool_answer_stream=answer_tool_results_stream,
                 tool_context=QaToolContext(
                     db=db,
                     user_id=current_user.id,

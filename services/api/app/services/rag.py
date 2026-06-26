@@ -169,3 +169,21 @@ async def answer_question_stream(
     except Exception as exc:
         logger.exception("LLM 流式调用失败")
         yield {"type": "error", "message": f"LLM 调用失败: {exc}"}
+
+
+async def answer_tool_results_stream(
+    question: str,
+    retrieved_chunks: list[dict[str, Any]],
+    system_prompt: str | None,
+    user_prompt: str | None,
+    llm: BaseChatModel,
+    chat_history: list[dict[str, str]] | None = None,
+    tool_results: list[QaToolResult] | None = None,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """根据内部工具结果回答问题。"""
+    del question, retrieved_chunks, system_prompt, user_prompt, llm, chat_history
+
+    for result in tool_results or []:
+        yield {"type": "chunk", "text": result.content}
+
+    yield {"type": "done", "status": "answered"}

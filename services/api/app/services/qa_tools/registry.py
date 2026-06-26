@@ -12,10 +12,11 @@ from app.services.qa_tools.review_approval import (
 )
 from app.services.qa_tools.review_list import (
     REVIEW_LIST_TOOL_NAME,
+    ReviewListOutputMode,
     get_review_list,
     review_list_tool,
 )
-from app.services.qa_tools.types import QaToolContext, QaToolResult
+from app.services.qa_tools.types import QaToolContext, QaToolPlan, QaToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +33,35 @@ async def run_qa_tools(
     if context is None or llm is None:
         return []
 
+    tool_plans = await plan_qa_tools(question, llm, chat_history)
+    return execute_qa_tool_plans(context, tool_plans)
+
+
+async def plan_qa_tools(
+    question: str,
+    llm: Any,
+    chat_history: list[dict[str, str]] | None = None,
+) -> list[QaToolPlan]:
     tool_calls = await _select_tools(question, llm, chat_history)
+    return [
+        QaToolPlan(name=tool_call["name"], args=tool_call.get("args") or {})
+        for tool_call in tool_calls
+    ]
+
+
+def execute_qa_tool_plans(
+    context: QaToolContext | None,
+    tool_plans: list[QaToolPlan],
+) -> list[QaToolResult]:
+    if context is None:
+        return []
 
     results: list[QaToolResult] = []
-    for tool_call in tool_calls:
-        tool_name = tool_call.get("name")
-        if tool_name == REVIEW_LIST_TOOL_NAME:
-            results.append(get_review_list(context))
-        elif tool_name == REVIEW_APPROVAL_TOOL_NAME:
-            results.append(approve_review(context, _get_document_id(tool_call)))
+    for tool_plan in tool_plans:
+        if tool_plan.name == REVIEW_LIST_TOOL_NAME:
+            results.append(get_review_list(context, _get_review_list_output_mode(tool_plan)))
+        elif tool_plan.name == REVIEW_APPROVAL_TOOL_NAME:
+            results.append(approve_review(context, _get_document_id(tool_plan)))
 
     return results
 
@@ -82,8 +103,8 @@ def _build_tool_selection_messages(
     return messages
 
 
-def _get_document_id(tool_call: dict[str, Any]) -> int | None:
-    args = tool_call.get("args") or {}
+def _get_document_id(tool_plan: QaToolPlan) -> int | None:
+    args = tool_plan.args
     value = args.get("document_id") or args.get("id")
     if value is None:
         return None
@@ -92,3 +113,10 @@ def _get_document_id(tool_call: dict[str, Any]) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _get_review_list_output_mode(tool_plan: QaToolPlan) -> ReviewListOutputMode:
+    args = tool_plan.args
+    if args.get("output_mode") == "count_only":
+        return "count_only"
+    return "table"

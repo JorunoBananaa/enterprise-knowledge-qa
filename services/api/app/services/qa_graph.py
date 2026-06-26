@@ -7,7 +7,13 @@ from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.services.qa_tools import QaToolContext, QaToolResult, run_qa_tools
+from app.services.qa_tools import (
+    QaToolContext,
+    QaToolPlan,
+    QaToolResult,
+    execute_qa_tool_plans,
+    plan_qa_tools,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +21,7 @@ QaEvent = dict[str, Any]
 RewriteQuestion = Callable[[str, list[dict[str, str]] | None, Any], Awaitable[str]]
 RetrieveChunks = Callable[[str, list[int] | None], Awaitable[list[dict[str, Any]]]]
 AnswerStream = Callable[..., AsyncIterator[QaEvent]]
+ToolAnswerStream = Callable[..., AsyncIterator[QaEvent]]
 
 
 @dataclass
@@ -26,6 +33,7 @@ class QaGraphState:
     target_document_ids: list[int] | None = None
     retrieval_question: str | None = None
     retrieved_chunks: list[dict[str, Any]] = field(default_factory=list)
+    tool_plans: list[QaToolPlan] = field(default_factory=list)
     tool_results: list[QaToolResult] = field(default_factory=list)
 
 
@@ -35,6 +43,7 @@ class QaGraphContext:
     rewrite_question: RewriteQuestion
     retrieve_chunks: RetrieveChunks
     answer_stream: AnswerStream
+    tool_answer_stream: ToolAnswerStream | None = None
     tool_context: QaToolContext | None = None
 
 
@@ -46,6 +55,7 @@ class _GraphState(TypedDict, total=False):
     target_document_ids: list[int] | None
     retrieval_question: str | None
     retrieved_chunks: list[dict[str, Any]]
+    tool_plans: list[QaToolPlan]
     tool_results: list[QaToolResult]
 
 
@@ -58,6 +68,7 @@ def _to_graph_state(state: QaGraphState) -> _GraphState:
         "target_document_ids": state.target_document_ids,
         "retrieval_question": state.retrieval_question,
         "retrieved_chunks": list(state.retrieved_chunks),
+        "tool_plans": list(state.tool_plans),
         "tool_results": list(state.tool_results),
     }
 
@@ -88,12 +99,18 @@ def _build_graph(context: QaGraphContext):
         )
         return {"retrieved_chunks": chunks}
 
-    async def run_tools(state: _GraphState) -> _GraphState:
-        tool_results = await run_qa_tools(
+    async def plan_tools(state: _GraphState) -> _GraphState:
+        tool_plans = await plan_qa_tools(
             state["question"],
-            context.tool_context,
             context.llm,
             chat_history=state.get("chat_history"),
+        )
+        return {"tool_plans": tool_plans}
+
+    async def run_tools(state: _GraphState) -> _GraphState:
+        tool_results = execute_qa_tool_plans(
+            context.tool_context,
+            state.get("tool_plans") or [],
         )
         return {"tool_results": tool_results}
 
@@ -112,12 +129,14 @@ def _build_graph(context: QaGraphContext):
     graph.add_node("load_context", load_context)
     graph.add_node("rewrite_query", rewrite_query)
     graph.add_node("retrieve_chunks", retrieve_chunks)
+    graph.add_node("plan_tools", plan_tools)
     graph.add_node("run_tools", run_tools)
     graph.add_node("generate_answer", generate_answer)
     graph.add_node("build_result", build_result)
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "rewrite_query")
-    graph.add_edge("rewrite_query", "run_tools")
+    graph.add_edge("rewrite_query", "plan_tools")
+    graph.add_edge("plan_tools", "run_tools")
     graph.add_conditional_edges(
         "run_tools",
         route_after_tools,
@@ -135,7 +154,13 @@ async def run_qa_graph(
 ) -> AsyncIterator[QaEvent]:
     graph = _build_graph(context)
     final_state = await graph.ainvoke(_to_graph_state(state))
-    async for event in context.answer_stream(
+    answer_stream = (
+        context.tool_answer_stream
+        if final_state.get("tool_results") and context.tool_answer_stream is not None
+        else context.answer_stream
+    )
+
+    async for event in answer_stream(
         question=final_state["question"],
         retrieved_chunks=final_state.get("retrieved_chunks") or [],
         system_prompt=final_state.get("system_prompt"),

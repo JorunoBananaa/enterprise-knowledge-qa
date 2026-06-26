@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
@@ -11,16 +11,25 @@ from app.services.qa_tools.types import QaToolContext, QaToolResult
 REVIEW_LIST_TOOL_NAME = "review_list"
 
 
+ReviewListOutputMode = Literal["table", "count_only"]
+
+
 @tool(REVIEW_LIST_TOOL_NAME)
-def review_list_tool() -> str:
+def review_list_tool(output_mode: ReviewListOutputMode = "table") -> str:
     """获取管理员可查看的待审核文档列表。
 
     当用户想查看正在等待审核、批准、复核或流程处理的文档时使用。
+    如果用户只询问数量或明确要求“数量即可”，output_mode 使用 count_only。
     """
+    if output_mode == "count_only":
+        return "获取待审核文档数量。"
     return "获取待审核文档列表。"
 
 
-def get_review_list(context: QaToolContext) -> QaToolResult:
+def get_review_list(
+    context: QaToolContext,
+    output_mode: ReviewListOutputMode = "table",
+) -> QaToolResult:
     if context.role != "admin":
         return QaToolResult(
             name=REVIEW_LIST_TOOL_NAME,
@@ -43,7 +52,9 @@ def get_review_list(context: QaToolContext) -> QaToolResult:
     total = query.count()
     documents = query.order_by(KnowledgeDocument.id.desc()).limit(limit).all()
 
-    if not documents:
+    if output_mode == "count_only":
+        content = f"当前共有 {total} 个待审核文档。"
+    elif not documents:
         content = "当前没有待审核文档。"
     else:
         rows = [
@@ -62,7 +73,7 @@ def get_review_list(context: QaToolContext) -> QaToolResult:
     return QaToolResult(
         name=REVIEW_LIST_TOOL_NAME,
         content=content,
-        metadata={"total": total, "limit": limit},
+        metadata={"total": total, "limit": limit, "output_mode": output_mode},
     )
 
 
