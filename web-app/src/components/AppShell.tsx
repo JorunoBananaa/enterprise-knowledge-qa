@@ -330,7 +330,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             loading={creatingSession}
             className="!flex !items-center !justify-start !gap-[9px] !h-7 !w-full !mt-[18px] !mb-4 !rounded-md !bg-app-primary !px-3 !text-sm !font-bold !shadow-none hover:!bg-[#262626]"
           >
-            新建回答
+            新建问答
           </Button>
 
           <nav className="grid gap-0.5 mb-[22px]" aria-label="主导航">
