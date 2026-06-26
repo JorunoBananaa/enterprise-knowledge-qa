@@ -40,6 +40,7 @@ from app.services.chat_persistence import (
     update_session_title_for_first_question,
 )
 from app.services.llm_factory import create_chat_model
+from app.services.qa_orchestrator import QaStreamInput, stream_qa_events
 from app.services.rag import answer_question_stream, rewrite_question_for_retrieval
 
 router = APIRouter()
@@ -689,21 +690,16 @@ async def ask_question_stream(
 
         system_prompt, user_prompt = _resolve_prompts(current_user.id)
         chat_history = _load_chat_history(session.id, db)
-        retrieval_question = await rewrite_question_for_retrieval(
-            question=payload.question,
-            chat_history=chat_history,
-            llm=llm,
-        )
 
-        if await _should_stop():
-            _persist_pre_stream_abort()
-            _unregister_ask_cancel_state(payload.request_id, cancel_state)
-            return _empty_stream_response()
-
-        # 通过 pgvector ANN 搜索检索相关块（带范围过滤）
-        retrieved_chunks = await _retrieve_chunks(
-            retrieval_question, db, target_document_ids=target_document_ids,
-        )
+        async def retrieve_chunks_for_graph(
+            retrieval_question: str,
+            target_document_ids_for_graph: list[int] | None,
+        ) -> list[dict[str, Any]]:
+            return await _retrieve_chunks(
+                retrieval_question,
+                db,
+                target_document_ids=target_document_ids_for_graph,
+            )
 
         if await _should_stop():
             _persist_pre_stream_abort()
@@ -746,14 +742,19 @@ async def ask_question_stream(
 
             yield format_sse("session", {"session_id": session.id})
 
-            async for event in answer_question_stream(
+            graph_input = QaStreamInput(
                 question=payload.question,
-                retrieved_chunks=retrieved_chunks,
+                chat_history=chat_history,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
+                target_document_ids=target_document_ids,
                 llm=llm,
-                chat_history=chat_history,
-            ):
+                rewrite_question=rewrite_question_for_retrieval,
+                retrieve_chunks=retrieve_chunks_for_graph,
+                answer_stream=answer_question_stream,
+            )
+
+            async for event in stream_qa_events(graph_input):
                 if await _should_stop():
                     persist_message("aborted")
                     return
