@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const apiDir = resolve(rootDir, "services/api");
+const servicesDir = resolve(rootDir, "services");
 const condaCommand = process.platform === "win32" ? "conda.bat" : "conda";
 const condaEnv = process.env.CONDA_ENV_NAME || "3.14.4";
 const port = process.env.API_PORT || "8000";
@@ -117,7 +117,7 @@ function startBackend() {
       port,
     ],
     {
-      cwd: apiDir,
+      cwd: servicesDir,
       env: process.env,
       stdio: "inherit",
     },

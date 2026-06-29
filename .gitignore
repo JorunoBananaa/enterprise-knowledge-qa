@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.venv/
 .env
 node_modules/
 .next/
@@ -11,5 +12,5 @@ test.db
 .worktrees/
 docs/*
 
-services/api/storage/*
-!services/api/storage/uploads/README.md
+services/storage/*
+!services/storage/uploads/README.md

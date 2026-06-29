@@ -36,70 +36,69 @@ enterprise-knowledge-qa/
 ├── scripts/
 │   └── dev-services.mjs                # 后端开发服务启动脚本（Conda 环境 + Uvicorn）
 │
-├── services/
-│   └── api/                            # ██ 后端 API 服务（Python / FastAPI）
-│       ├── pyproject.toml              # 项目元数据 & 依赖声明
-│       ├── storage/
-│       │   └── uploads/                # 文档上传存储目录
-│       └── app/
-│           ├── main.py                 # FastAPI 应用入口、路由注册、启动初始化
-│           │
-│           ├── api/                    # 接口层（Controller）
-│           │   ├── deps.py             # 依赖注入（获取当前用户、数据库会话）
-│           │   └── routes/
-│           │       ├── auth.py         # 登录 / 登出 / 获取当前用户
-│           │       ├── categories.py   # 知识分类 CRUD
-│           │       ├── documents.py    # 文档上传 / 列表 / 删除
-│           │       ├── llm_config.py   # LLM 配置 CRUD
-│           │       ├── prompts.py      # 提示词模板 CRUD
-│           │       ├── qa.py           # 问答接口（支持流式 SSE）
-│           │       ├── review.py       # 文档审核工作流
-│           │       └── users.py        # 用户管理 CRUD
-│           │
-│           ├── core/                   # 核心配置与安全
-│           │   ├── config.py           # Pydantic Settings（环境变量 / 默认值）
-│           │   └── security.py         # JWT 生成 & 验证、密码哈希
-│           │
-│           ├── db/                     # 数据访问层
-│           │   ├── base.py             # SQLAlchemy DeclarativeBase
-│           │   └── session.py          # 数据库引擎 & 会话工厂
-│           │
-│           ├── models/                 # ORM 模型（Entity）
-│           │   ├── user.py             # 用户 + 角色 / 状态枚举
-│           │   ├── document.py         # 知识文档 + 审核 / 索引状态
-│           │   ├── document_chunk.py   # 文档分块 + 向量存储
-│           │   ├── category.py         # 树形知识分类
-│           │   ├── chat.py             # 问答会话 & 消息记录
-│           │   ├── llm_config.py       # LLM 配置（提供商 / 模型 / Key）
-│           │   └── prompt.py           # 提示词模板（系统 / 用户）
-│           │
-│           ├── repositories/          # 仓库模式（数据查询封装）
-│           │   ├── categories.py
-│           │   ├── documents.py
-│           │   ├── llm_config.py
-│           │   ├── prompts.py
-│           │   └── users.py
-│           │
-│           ├── schemas/               # Pydantic 请求 / 响应 Schema
-│           │   ├── auth.py
-│           │   ├── category.py
-│           │   ├── chat.py
-│           │   ├── document.py
-│           │   ├── llm_config.py
-│           │   ├── prompt.py
-│           │   └── user.py
-│           │
-│           └── services/              # 业务服务层
-│               ├── rag.py             # RAG 问答核心（检索增强生成 + 流式）
-│               ├── ingestion.py       # 文档解析 & 文本分块（PDF/Word/PPT/Excel/TXT/MD/CSV）
-│               ├── indexing.py        # 文档向量化 & pgvector 入索引
-│               ├── embedding_factory.py # Embedding 模型工厂（多提供商）
-│               ├── llm_factory.py     # LLM 模型工厂（多提供商）
-│               ├── prompt_composer.py # 提示词组装（系统提示词 + 上下文 + 问题）
-│               ├── ocr.py             # 图片 OCR 文字识别（PaddleOCR-VL）
-│               ├── chat_branching.py  # 会话分支（从指定消息 fork 新会话）
-│               ├── chat_persistence.py # 会话消息 & 引用持久化
-│               └── storage.py         # 文件存储（本地磁盘）
+├── services/                           # ██ 后端服务（Python / FastAPI）
+│   ├── pyproject.toml                  # 项目元数据 & 依赖声明
+│   ├── storage/
+│   │   └── uploads/                    # 文档上传存储目录
+│   └── app/
+│       ├── main.py                     # FastAPI 应用入口、路由注册、启动初始化
+│       │
+│       ├── api/                        # 接口层（Controller）
+│       │   ├── deps.py                 # 依赖注入（获取当前用户、数据库会话）
+│       │   └── routes/
+│       │       ├── auth.py             # 登录 / 登出 / 获取当前用户
+│       │       ├── categories.py       # 知识分类 CRUD
+│       │       ├── documents.py        # 文档上传 / 列表 / 删除
+│       │       ├── llm_config.py       # LLM 配置 CRUD
+│       │       ├── prompts.py          # 提示词模板 CRUD
+│       │       ├── qa.py               # 问答接口（支持流式 SSE）
+│       │       ├── review.py           # 文档审核工作流
+│       │       └── users.py            # 用户管理 CRUD
+│       │
+│       ├── core/                       # 核心配置与安全
+│       │   ├── config.py               # Pydantic Settings（环境变量 / 默认值）
+│       │   └── security.py             # JWT 生成 & 验证、密码哈希
+│       │
+│       ├── db/                         # 数据访问层
+│       │   ├── base.py                 # SQLAlchemy DeclarativeBase
+│       │   └── session.py              # 数据库引擎 & 会话工厂
+│       │
+│       ├── models/                     # ORM 模型（Entity）
+│       │   ├── user.py                 # 用户 + 角色 / 状态枚举
+│       │   ├── document.py             # 知识文档 + 审核 / 索引状态
+│       │   ├── document_chunk.py       # 文档分块 + 向量存储
+│       │   ├── category.py             # 树形知识分类
+│       │   ├── chat.py                 # 问答会话 & 消息记录
+│       │   ├── llm_config.py           # LLM 配置（提供商 / 模型 / Key）
+│       │   └── prompt.py               # 提示词模板（系统 / 用户）
+│       │
+│       ├── repositories/               # 仓库模式（数据查询封装）
+│       │   ├── categories.py
+│       │   ├── documents.py
+│       │   ├── llm_config.py
+│       │   ├── prompts.py
+│       │   └── users.py
+│       │
+│       ├── schemas/                    # Pydantic 请求 / 响应 Schema
+│       │   ├── auth.py
+│       │   ├── category.py
+│       │   ├── chat.py
+│       │   ├── document.py
+│       │   ├── llm_config.py
+│       │   ├── prompt.py
+│       │   └── user.py
+│       │
+│       └── services/                   # 业务服务层
+│           ├── rag.py                  # RAG 问答核心（检索增强生成 + 流式）
+│           ├── ingestion.py            # 文档解析 & 文本分块（PDF/Word/PPT/Excel/TXT/MD/CSV）
+│           ├── indexing.py             # 文档向量化 & pgvector 入索引
+│           ├── embedding_factory.py    # Embedding 模型工厂（多提供商）
+│           ├── llm_factory.py          # LLM 模型工厂（多提供商）
+│           ├── prompt_composer.py      # 提示词组装（系统提示词 + 上下文 + 问题）
+│           ├── ocr.py                  # 图片 OCR 文字识别（PaddleOCR-VL）
+│           ├── chat_branching.py       # 会话分支（从指定消息 fork 新会话）
+│           ├── chat_persistence.py     # 会话消息 & 引用持久化
+│           └── storage.py              # 文件存储（本地磁盘）
 │
 └── web-app/                            # ██ 前端 Web 应用（Next.js / React）
     ├── package.json                    # 前端依赖
@@ -230,7 +229,7 @@ pnpm run init
 
 ```bash
 conda activate 3.14.4
-python -m pip install -e services/api
+python -m pip install -e services
 ```
 
 ### 4. 启动开发服务
@@ -329,7 +328,7 @@ SSE 事件：
 
 ### 后端
 
-后端配置通过 `services/api/app/core/config.py`（Pydantic Settings）管理，支持环境变量覆盖：
+后端配置通过 `services/app/core/config.py`（Pydantic Settings）管理，支持环境变量覆盖：
 
 | 变量                          | 默认值                                                       | 说明           |
 | ----------------------------- | ------------------------------------------------------------ | -------------- |
@@ -344,7 +343,7 @@ SSE 事件：
 | `EMBEDDING_DIMENSION`         | `384`                                                        | 向量维度       |
 | `UPLOAD_DIR`                  | `storage/uploads`                                            | 文件上传目录   |
 
-> **注：** `PADDLEOCR_TOKEN`（图片 OCR，可选）不在 `config.py` 中管理，而是由 `services/api/app/services/ocr.py` 通过 `os.getenv('PADDLEOCR_TOKEN', ...)` 直接读取，未设置时使用代码内置的演示 Token。
+> **注：** `PADDLEOCR_TOKEN`（图片 OCR，可选）不在 `config.py` 中管理，而是由 `services/app/services/ocr.py` 通过 `os.getenv('PADDLEOCR_TOKEN', ...)` 直接读取，未设置时使用代码内置的演示 Token。
 
 ### 开发脚本
 
