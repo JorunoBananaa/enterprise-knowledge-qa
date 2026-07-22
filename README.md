@@ -34,7 +34,7 @@ enterprise-knowledge-qa/
 │   └── docker-compose.yml              # PostgreSQL + pgvector 容器编排
 │
 ├── scripts/
-│   └── dev-services.mjs                # 后端开发服务启动脚本（Conda 环境 + Uvicorn）
+│   └── dev-services.mjs                # 后端开发服务启动脚本（Python 环境 + Uvicorn）
 │
 ├── services/                           # ██ 后端服务（Python / FastAPI）
 │   ├── pyproject.toml                  # 项目元数据 & 依赖声明
@@ -208,7 +208,7 @@ flowchart LR
 
 - **Node.js** >= 18
 - **pnpm** >= 8
-- **Python** >= 3.11（推荐 [Conda](https://docs.conda.io/) 环境 `3.14.4`）
+- **Python** >= 3.11
 - **Docker** + Docker Compose
 
 ### 1. 启动数据库
@@ -225,10 +225,9 @@ pnpm run init
 
 ### 3. 安装后端依赖
 
-默认开发脚本会通过 `conda run -n 3.14.4` 启动后端。如果使用其他 Conda 环境名，请设置 `CONDA_ENV_NAME`。
+开发脚本会通过当前 Python 环境的 `python -m uvicorn` 启动后端。如需指定 Python 解释器，请设置 `PYTHON`。
 
 ```bash
-conda activate 3.14.4
 python -m pip install -e services
 ```
 
@@ -350,7 +349,7 @@ SSE 事件：
 | 变量             | 默认值   | 说明                                            |
 | ---------------- | -------- | ----------------------------------------------- |
 | `API_PORT`       | `8000`   | 后端端口（`scripts/dev-services.mjs`）          |
-| `CONDA_ENV_NAME` | `3.14.4` | Conda 环境名称（`scripts/dev-services.mjs`）    |
+| `PYTHON`        | `python` | Python 解释器路径（`scripts/dev-services.mjs`） |
 
 `pnpm dev:services` 会自动释放同一项目遗留的 Uvicorn 进程；如果端口被其他进程占用，脚本会拒绝强制结束。
 

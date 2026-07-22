@@ -6,8 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const servicesDir = resolve(rootDir, "services");
-const condaCommand = process.platform === "win32" ? "conda.bat" : "conda";
-const condaEnv = process.env.CONDA_ENV_NAME || "3.14.4";
+const pythonCommand = process.env.PYTHON || "python";
 const port = process.env.API_PORT || "8000";
 
 function run(command, args) {
@@ -104,12 +103,9 @@ async function freeBackendPort() {
 
 function startBackend() {
   const child = spawn(
-    condaCommand,
+    pythonCommand,
     [
-      "run",
-      "-n",
-      condaEnv,
-      "--no-capture-output",
+      "-m",
       "uvicorn",
       "app.main:app",
       "--reload",
