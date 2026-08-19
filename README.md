@@ -1,3 +1,12 @@
+# 项目演示
+
+[▶️ 在 GitHub 中播放项目演示视频](https://raw.githubusercontent.com/JorunoBananaa/enterprise-knowledge-qa/master/assets/vedio.mp4)
+
+<video controls width="100%">
+  <source src="https://raw.githubusercontent.com/JorunoBananaa/enterprise-knowledge-qa/master/assets/vedio.mp4" type="video/mp4">
+  当前预览器不支持内嵌播放，请点击上方链接播放视频。
+</video>
+
 # Knowledge QA · 知识库问答系统
 
 基于 **RAG (Retrieval-Augmented Generation)** 的知识库智能问答平台。支持树形知识分类、多格式文档上传、审核后自动向量化索引、多 LLM 提供商接入，以及带会话历史、检索范围筛选和引用来源详情的流式问答体验。
