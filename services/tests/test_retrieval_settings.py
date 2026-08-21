@@ -8,6 +8,12 @@ from app.core.config import Settings
 
 
 class RetrievalSettingsTests(unittest.TestCase):
+    def test_local_ollama_defaults_match_project_runtime(self) -> None:
+        configured = Settings()
+
+        self.assertEqual(configured.embedding_model_name, "qwen3-embedding:latest")
+        self.assertEqual(configured.ollama_base_url, "http://127.0.0.1:12434/v1")
+
     def test_retrieval_policy_settings_are_explicit(self) -> None:
         configured = Settings(
             retrieval_candidate_k=12,

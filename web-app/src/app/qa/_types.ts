@@ -24,6 +24,10 @@ export interface SessionItem {
   title: string | null;
   created_at: string;
   message_count: number;
+  parent_session_id: number | null;
+  branch_from_message_id: number | null;
+  version: number;
+  visibility: string;
 }
 
 export interface SessionDetail extends SessionItem {

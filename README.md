@@ -288,8 +288,9 @@ pnpm dev:services
 | `llm_config_id`   | `number \| null`   | 指定 LLM 配置；为空时使用活跃配置               |
 | `category_ids`    | `number[] \| null` | 检索范围：分类及其子分类                        |
 | `document_ids`    | `number[] \| null` | 检索范围：指定文档                              |
-| `request_id`      | `string \| null`   | 客户端生成的请求 ID，用于取消生成               |
-| `edit_message_id` | `number \| null`   | 编辑模式：截断该消息及后续消息后以新问题重新生成 |
+| `request_id`      | `string`           | 客户端生成的 UUID；用于幂等重放、状态查询和取消 |
+| `edit_message_id` | `number \| null`   | 编辑模式：从该消息之前的历史创建新分支          |
+| `session_version` | `number \| null`   | 编辑时必填；旧版本请求返回 `409 Conflict`       |
 
 SSE 事件：
 
@@ -303,6 +304,8 @@ SSE 事件：
 
 `result_status` 取值：`streaming`（生成中）、`answered`（已回答）、`insufficient_evidence`（无引用证据，使用兜底文案）、`aborted`（已取消）、`error`（失败）。
 
+相同用户使用相同 `request_id` 重试已完成请求时，服务端重放原消息和引用，不会再次调用模型或重复写入。可通过 `GET /qa/requests/{request_id}` 查询当前用户请求的 `streaming` 状态或最终消息状态。
+
 ## 取消生成
 
 前端通过 `POST /qa/ask/cancel` 取消进行中的流式问答。请求体：
@@ -311,11 +314,13 @@ SSE 事件：
 { "request_id": "..." }
 ```
 
-后端会取消对应的流式任务并将已生成的部分保存为 `aborted` 状态的消息。返回 `{"cancelled": true | false}`。
+取消键绑定当前用户与请求 ID；用户不能取消其他用户的请求。普通问答取消后会将已生成部分保存为 `aborted`，编辑生成取消时会丢弃临时分支并保留原会话。返回 `{"cancelled": true | false}`。当前取消状态仍保存在 API 进程内，跨实例取消将在后续 Redis/SSE 改造中完成。
 
 ## 编辑问题重新生成
 
-在 `POST /qa/ask/stream` 请求体中传入 `edit_message_id`，后端会删除该消息及其后续所有消息，然后以新的 `question` 重新生成回答。前端在编辑模式下会先乐观地截断消息列表，再发起流式请求。
+在 `POST /qa/ask/stream` 请求体中同时传入 `edit_message_id` 和当前 `session_version`。后端保留原会话，从目标消息之前复制历史到 `provisional` 分支；只有新回答成功持久化后才将分支切换为 `active` 并让前端进入新会话。配置错误、生成失败或取消都会删除临时分支。原会话用原子版本更新防止并发编辑，旧版本请求返回 `409 Conflict`。
+
+聊天工具只注册审核列表、文档详情等只读能力。审批、驳回、删除等写工具即使被伪造为工具计划，也会返回 `confirmation_required`，不会产生副作用；管理员继续使用确定性的管理页面/API。
 
 ## 问答分支
 
@@ -353,9 +358,9 @@ SSE 事件：
 | `UPLOAD_MAX_FILES_PER_REQUEST`     | `10`                                                          | 单次上传文件数上限 |
 | `UPLOAD_ALLOWED_EXTENSIONS`        | `.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv`                        | 允许上传且当前真正支持解析的格式 |
 | `EMBEDDING_PROVIDER`               | `ollama`                                                      | Embedding 提供商 |
-| `EMBEDDING_MODEL_NAME`             | `dengcao/Qwen3-Embedding-8B:Q4_K_M`                           | Embedding 模型 |
+| `EMBEDDING_MODEL_NAME`             | `qwen3-embedding:latest`                                      | 本地 Ollama Embedding 模型 |
 | `EMBEDDING_DIMENSION`              | `4096`                                                        | 当前向量维度 |
-| `OLLAMA_BASE_URL`                  | `http://localhost:11434/v1`                                  | 本地 Ollama 地址 |
+| `OLLAMA_BASE_URL`                  | `http://127.0.0.1:12434/v1`                                  | 本地 Ollama OpenAI 兼容接口地址 |
 | `MODEL_BASE_URL_ALLOWLIST`         | 空                                                            | 额外允许的模型服务完整基址，逗号分隔 |
 | `RETRIEVAL_CANDIDATE_K`            | `20`                                                          | 状态与范围硬过滤后的向量召回候选上限 |
 | `RETRIEVAL_MAX_EVIDENCE`           | `5`                                                           | 最多允许进入生成与引用链路的证据数 |

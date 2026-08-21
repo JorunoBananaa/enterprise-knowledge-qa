@@ -23,6 +23,7 @@ export interface QAAskInput {
   document_ids: number[] | null;
   request_id: string | null;
   edit_message_id: number | null;
+  session_version: number | null;
 }
 
 type QAChatOutput = SSEOutput;
@@ -93,6 +94,7 @@ export class QAChatProvider extends AbstractChatProvider<
       document_ids: normalizeOptionalIds(params.document_ids),
       request_id: params.request_id ?? null,
       edit_message_id: params.edit_message_id ?? null,
+      session_version: params.session_version ?? null,
     };
   }
 

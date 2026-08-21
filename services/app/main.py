@@ -26,6 +26,7 @@ def _initialize_database() -> None:
         conn.commit()
     Base.metadata.create_all(bind=engine)
     _ensure_citation_document_delete_behavior()
+    _ensure_chat_session_branching_columns()
 
     _seed_development_users()
     _reject_legacy_weak_users_in_production()
@@ -130,6 +131,72 @@ def _ensure_citation_document_delete_behavior() -> None:
                     FOREIGN KEY (document_id)
                     REFERENCES knowledge_documents(id)
                     ON DELETE SET NULL;
+                END $$;
+                """
+            )
+        )
+
+
+def _ensure_chat_session_branching_columns() -> None:
+    """阶段 3 引入 Alembic 前，兼容已有开发数据库的会话分支字段。"""
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                ALTER TABLE chat_sessions
+                    ADD COLUMN IF NOT EXISTS parent_session_id integer,
+                    ADD COLUMN IF NOT EXISTS branch_from_message_id integer,
+                    ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS visibility varchar(16) NOT NULL DEFAULT 'active'
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE chat_messages
+                    ADD COLUMN IF NOT EXISTS request_id varchar(64)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_messages_request_id
+                ON chat_messages (request_id)
+                WHERE request_id IS NOT NULL
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'chat_sessions_parent_session_id_fkey'
+                    ) THEN
+                        ALTER TABLE chat_sessions
+                        ADD CONSTRAINT chat_sessions_parent_session_id_fkey
+                        FOREIGN KEY (parent_session_id)
+                        REFERENCES chat_sessions(id)
+                        ON DELETE SET NULL;
+                    END IF;
+
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'chat_sessions_branch_from_message_id_fkey'
+                    ) THEN
+                        ALTER TABLE chat_sessions
+                        ADD CONSTRAINT chat_sessions_branch_from_message_id_fkey
+                        FOREIGN KEY (branch_from_message_id)
+                        REFERENCES chat_messages(id)
+                        ON DELETE SET NULL;
+                    END IF;
                 END $$;
                 """
             )

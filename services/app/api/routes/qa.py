@@ -30,7 +30,12 @@ from app.schemas.chat import (
 from app.services.embedding_factory import create_embeddings
 from app.services.chat_branching import (
     ChatBranchTargetNotFound,
+    ChatSessionVersionConflict,
+    activate_chat_session,
+    discard_chat_session,
     fork_chat_session_at_message,
+    fork_chat_session_before_message,
+    reserve_chat_session_edit,
 )
 from app.services.chat_persistence import (
     _first_line,
@@ -70,7 +75,8 @@ class AskCancelState:
     task: asyncio.Task[Any] | None = None
 
 
-_ASK_CANCEL_STATES: dict[str, AskCancelState] = {}
+AskCancelKey = tuple[int, str]
+_ASK_CANCEL_STATES: dict[AskCancelKey, AskCancelState] = {}
 
 
 # ── 工具函数 ───────────────────────────────────────────────────────────
@@ -84,14 +90,88 @@ def format_sse(event_type: str, data: dict | str | None = None) -> str:
     return f"event: {event_type}\ndata: {payload}\n\n"
 
 
-def _register_ask_cancel_state(request_id: str | None) -> AskCancelState | None:
+def _replay_completed_request(
+    db: Session,
+    *,
+    user_id: str,
+    request_id: str,
+) -> StreamingResponse | None:
+    message = (
+        db.query(ChatMessage)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .filter(
+            ChatMessage.request_id == request_id,
+            ChatSession.user_id == user_id,
+            ChatSession.visibility == "active",
+        )
+        .first()
+    )
+    if message is None:
+        return None
+
+    events = [format_sse("session", {"session_id": message.session_id})]
+    if message.answer:
+        events.append(format_sse("chunk", {"text": message.answer}))
+    citation_rows = (
+        db.query(Citation, KnowledgeDocument)
+        .outerjoin(
+            KnowledgeDocument,
+            KnowledgeDocument.id == Citation.document_id,
+        )
+        .filter(Citation.chat_message_id == message.id)
+        .order_by(Citation.rank.asc(), Citation.id.asc())
+        .all()
+    )
+    category_paths = _build_category_path_map(db) if citation_rows else {}
+    for citation, document in citation_rows:
+        events.append(
+            format_sse(
+                "citation",
+                {
+                    "document_id": citation.document_id,
+                    "document_title": document.title if document else None,
+                    "document_name": document.title if document else None,
+                    "document_file_type": document.file_type if document else None,
+                    "document_path": (
+                        category_paths.get(document.category_id) if document else None
+                    ),
+                    "document_category_id": document.category_id if document else None,
+                    "chunk_id": citation.chunk_id,
+                    "locator": citation.locator,
+                    "quoted_text_preview": citation.quoted_text_preview,
+                    "rank": citation.rank,
+                },
+            )
+        )
+    events.append(
+        format_sse(
+            "done",
+            {
+                "status": message.result_status,
+                "session_id": message.session_id,
+                "message_id": message.id,
+            },
+        )
+    )
+    return StreamingResponse(
+        iter(events),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
+
+
+def _register_ask_cancel_state(
+    user_id: int,
+    request_id: str | None,
+) -> AskCancelState | None:
     if not request_id:
         return None
 
-    state = _ASK_CANCEL_STATES.get(request_id)
+    key = (user_id, request_id)
+    state = _ASK_CANCEL_STATES.get(key)
     if state is None:
         state = AskCancelState(event=asyncio.Event())
-        _ASK_CANCEL_STATES[request_id] = state
+        _ASK_CANCEL_STATES[key] = state
 
     state.task = asyncio.current_task()
     return state
@@ -103,11 +183,13 @@ def _refresh_ask_cancel_task(state: AskCancelState | None) -> None:
 
 
 def _unregister_ask_cancel_state(
+    user_id: int,
     request_id: str | None,
     state: AskCancelState | None,
 ) -> None:
-    if request_id and _ASK_CANCEL_STATES.get(request_id) is state:
-        _ASK_CANCEL_STATES.pop(request_id, None)
+    key = (user_id, request_id) if request_id else None
+    if key is not None and _ASK_CANCEL_STATES.get(key) is state:
+        _ASK_CANCEL_STATES.pop(key, None)
 
 
 def _is_ask_cancelled(state: AskCancelState | None) -> bool:
@@ -127,6 +209,7 @@ def _resolve_session(
             .filter(
                 ChatSession.id == session_id,
                 ChatSession.user_id == user_id,
+                ChatSession.visibility == "active",
             )
             .first()
         )
@@ -204,52 +287,6 @@ def _load_chat_history(
         {"question": row.question, "answer": row.answer}
         for row in reversed(rows)
     ]
-
-
-def _truncate_session_from_message(
-    db: Session,
-    *,
-    session_id: int,
-    edit_message_id: int,
-) -> None:
-    """删除会话中的目标消息及其后的所有消息。
-
-    用于编辑问题流程：移除被编辑的问题及其回答（以及后续所有消息），
-    以便重新生成新的回答。
-    """
-    target = (
-        db.query(ChatMessage)
-        .filter(
-            ChatMessage.id == edit_message_id,
-            ChatMessage.session_id == session_id,
-        )
-        .first()
-    )
-    if target is None:
-        raise HTTPException(status_code=404, detail="编辑的消息不存在")
-
-    # 选择目标消息及其后的消息（按 created_at 和 id 判断顺序）
-    messages_to_delete = (
-        db.query(ChatMessage)
-        .filter(ChatMessage.session_id == session_id)
-        .filter(
-            (ChatMessage.created_at > target.created_at)
-            | (
-                (ChatMessage.created_at == target.created_at)
-                & (ChatMessage.id >= target.id)
-            )
-        )
-        .all()
-    )
-    message_ids = [m.id for m in messages_to_delete]
-    if message_ids:
-        db.query(Citation).filter(
-            Citation.chat_message_id.in_(message_ids)
-        ).delete(synchronize_session=False)
-        db.query(ChatMessage).filter(
-            ChatMessage.id.in_(message_ids)
-        ).delete(synchronize_session=False)
-        db.commit()
 
 
 def _resolve_category_tree(db: Session, category_ids: list[int]) -> list[int]:
@@ -369,7 +406,10 @@ def list_sessions(
     user_id = str(current_user.id)
     sessions = (
         db.query(ChatSession)
-        .filter(ChatSession.user_id == user_id)
+        .filter(
+            ChatSession.user_id == user_id,
+            ChatSession.visibility == "active",
+        )
         .order_by(ChatSession.created_at.desc())
         .all()
     )
@@ -386,6 +426,10 @@ def list_sessions(
                 title=s.title,
                 created_at=s.created_at,
                 message_count=msg_count,
+                parent_session_id=s.parent_session_id,
+                branch_from_message_id=s.branch_from_message_id,
+                version=s.version,
+                visibility=s.visibility,
             )
         )
     return out
@@ -407,6 +451,10 @@ def create_session(
         title=session.title,
         created_at=session.created_at,
         message_count=0,
+        parent_session_id=session.parent_session_id,
+        branch_from_message_id=session.branch_from_message_id,
+        version=session.version,
+        visibility=session.visibility,
     )
 
 
@@ -420,7 +468,11 @@ def get_session(
     user_id = str(current_user.id)
     session = (
         db.query(ChatSession)
-        .filter(ChatSession.id == session_id, ChatSession.user_id == user_id)
+        .filter(
+            ChatSession.id == session_id,
+            ChatSession.user_id == user_id,
+            ChatSession.visibility == "active",
+        )
         .first()
     )
     if not session:
@@ -476,6 +528,10 @@ def get_session(
         title=session.title,
         created_at=session.created_at,
         message_count=len(messages),
+        parent_session_id=session.parent_session_id,
+        branch_from_message_id=session.branch_from_message_id,
+        version=session.version,
+        visibility=session.visibility,
         messages=[
             ChatMessageOut(
                 id=m.id,
@@ -543,15 +599,41 @@ def fork_message(
 # ── 提问（流式） ───────────────────────────────────────────────────
 
 
+@router.get("/requests/{request_id}")
+def get_question_request(
+    request_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str | int]:
+    message = (
+        db.query(ChatMessage)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .filter(
+            ChatMessage.request_id == request_id,
+            ChatSession.user_id == str(current_user.id),
+            ChatSession.visibility == "active",
+        )
+        .first()
+    )
+    if message is not None:
+        return {
+            "request_id": request_id,
+            "status": message.result_status,
+            "session_id": message.session_id,
+            "message_id": message.id,
+        }
+    if (current_user.id, request_id) in _ASK_CANCEL_STATES:
+        return {"request_id": request_id, "status": "streaming"}
+    raise HTTPException(status_code=404, detail="请求不存在")
+
+
 @router.post("/ask/cancel")
 async def cancel_question_stream(
     payload: AskCancelRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> dict[str, bool]:
     """取消当前进程中正在进行的流式回答。"""
-    del current_user
-
-    state = _ASK_CANCEL_STATES.get(payload.request_id)
+    state = _ASK_CANCEL_STATES.get((current_user.id, payload.request_id))
     if state is None:
         return {"cancelled": False}
 
@@ -579,8 +661,18 @@ async def ask_question_stream(
         error   → {"message": "…"}
     """
     user_id = str(current_user.id)
-    cancel_state = _register_ask_cancel_state(payload.request_id)
+    replay = _replay_completed_request(
+        db,
+        user_id=user_id,
+        request_id=payload.request_id,
+    )
+    if replay is not None:
+        return replay
+    if (current_user.id, payload.request_id) in _ASK_CANCEL_STATES:
+        raise HTTPException(status_code=409, detail="相同 request_id 的请求正在执行")
+    cancel_state = _register_ask_cancel_state(current_user.id, payload.request_id)
     session: ChatSession | None = None
+    edit_branch_session: ChatSession | None = None
     pre_stream_abort_persisted = False
 
     async def _should_stop() -> bool:
@@ -600,6 +692,7 @@ async def ask_question_stream(
             answer_parts=[],
             result_status="aborted",
             citations=[],
+            request_id=payload.request_id,
         )
         pre_stream_abort_persisted = True
 
@@ -613,17 +706,45 @@ async def ask_question_stream(
     try:
         session = _resolve_session(user_id, payload.session_id, payload.question, db)
 
-        # 编辑模式：截断目标消息及其后续消息，然后重新生成
+        # 编辑模式：复制目标消息之前的历史；原会话始终保持不可变。
         if payload.edit_message_id is not None:
-            _truncate_session_from_message(
-                db,
-                session_id=session.id,
-                edit_message_id=payload.edit_message_id,
-            )
+            if payload.session_version is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="编辑会话必须提供 session_version",
+                )
+            try:
+                reserve_chat_session_edit(
+                    db,
+                    session_id=session.id,
+                    user_id=user_id,
+                    expected_version=payload.session_version,
+                )
+            except ChatSessionVersionConflict:
+                raise HTTPException(
+                    status_code=409,
+                    detail="会话已被其他请求修改，请刷新后重试",
+                )
+            try:
+                edit_branch_session = fork_chat_session_before_message(
+                    db,
+                    user_id=user_id,
+                    message_id=payload.edit_message_id,
+                )
+            except ChatBranchTargetNotFound:
+                raise HTTPException(status_code=404, detail="编辑的消息不存在")
+            session = edit_branch_session
 
         if await _should_stop():
-            _persist_pre_stream_abort()
-            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            if edit_branch_session is not None:
+                discard_chat_session(
+                    db, session_id=edit_branch_session.id, user_id=user_id
+                )
+            else:
+                _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(
+                current_user.id, payload.request_id, cancel_state
+            )
             return _empty_stream_response()
 
         # 同步构建 LLM
@@ -635,8 +756,15 @@ async def ask_question_stream(
             raise HTTPException(status_code=400, detail=f"无法初始化大模型: {exc}")
 
         if await _should_stop():
-            _persist_pre_stream_abort()
-            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            if edit_branch_session is not None:
+                discard_chat_session(
+                    db, session_id=edit_branch_session.id, user_id=user_id
+                )
+            else:
+                _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(
+                current_user.id, payload.request_id, cancel_state
+            )
             return _empty_stream_response()
 
         # 解析范围过滤（分类 → 文档 ID）
@@ -692,21 +820,46 @@ async def ask_question_stream(
             return result.to_context_chunks()
 
         if await _should_stop():
-            _persist_pre_stream_abort()
-            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            if edit_branch_session is not None:
+                discard_chat_session(
+                    db, session_id=edit_branch_session.id, user_id=user_id
+                )
+            else:
+                _persist_pre_stream_abort()
+            _unregister_ask_cancel_state(
+                current_user.id, payload.request_id, cancel_state
+            )
             return _empty_stream_response()
     except asyncio.CancelledError:
-        _persist_pre_stream_abort()
-        _unregister_ask_cancel_state(payload.request_id, cancel_state)
+        if edit_branch_session is not None:
+            discard_chat_session(
+                db,
+                session_id=edit_branch_session.id,
+                user_id=user_id,
+            )
+        if edit_branch_session is None:
+            _persist_pre_stream_abort()
+        _unregister_ask_cancel_state(
+            current_user.id, payload.request_id, cancel_state
+        )
         raise
     except Exception:
-        _unregister_ask_cancel_state(payload.request_id, cancel_state)
+        if edit_branch_session is not None:
+            discard_chat_session(
+                db,
+                session_id=edit_branch_session.id,
+                user_id=user_id,
+            )
+        _unregister_ask_cancel_state(
+            current_user.id, payload.request_id, cancel_state
+        )
         raise
 
     async def _stream_events():
         chunks_received: list[str] = []
         citation_list: list[dict] = []
         persisted_msg: ChatMessage | None = None
+        edit_branch_completed = False
 
         def persist_message(result_status: str) -> ChatMessage:
             nonlocal persisted_msg
@@ -720,6 +873,7 @@ async def ask_question_stream(
                 answer_parts=chunks_received,
                 result_status=result_status,
                 citations=citation_list,
+                request_id=payload.request_id,
             )
             return persisted_msg
 
@@ -727,7 +881,8 @@ async def ask_question_stream(
             _refresh_ask_cancel_task(cancel_state)
 
             if await _should_stop():
-                persist_message("aborted")
+                if edit_branch_session is None:
+                    persist_message("aborted")
                 return
 
             yield format_sse("session", {"session_id": session.id})
@@ -752,7 +907,8 @@ async def ask_question_stream(
 
             async for event in stream_qa_events(graph_input):
                 if await _should_stop():
-                    persist_message("aborted")
+                    if edit_branch_session is None:
+                        persist_message("aborted")
                     return
 
                 if event["type"] == "chunk":
@@ -766,6 +922,14 @@ async def ask_question_stream(
                 elif event["type"] == "done":
                     msg = persist_message(event.get("status", "answered"))
 
+                    if edit_branch_session is not None:
+                        activate_chat_session(
+                            db,
+                            session_id=edit_branch_session.id,
+                            user_id=user_id,
+                        )
+                        edit_branch_completed = True
+
                     yield format_sse("done", {
                         "status": event.get("status", "answered"),
                         "session_id": session.id,
@@ -778,13 +942,22 @@ async def ask_question_stream(
                     return
 
         except asyncio.CancelledError:
-            persist_message("aborted")
+            if edit_branch_session is None:
+                persist_message("aborted")
             raise
         except Exception as exc:
             logging.getLogger(__name__).exception("Stream error")
             yield format_sse("error", {"message": f"流式生成失败: {exc}"})
         finally:
-            _unregister_ask_cancel_state(payload.request_id, cancel_state)
+            if edit_branch_session is not None and not edit_branch_completed:
+                discard_chat_session(
+                    db,
+                    session_id=edit_branch_session.id,
+                    user_id=user_id,
+                )
+            _unregister_ask_cancel_state(
+                current_user.id, payload.request_id, cancel_state
+            )
 
     return StreamingResponse(
         _stream_events(),

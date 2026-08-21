@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     upload_max_archive_compression_ratio: int = 200
 
     embedding_provider: str = "ollama"
-    embedding_model_name: str = "dengcao/Qwen3-Embedding-8B:Q4_K_M"
+    embedding_model_name: str = "qwen3-embedding:latest"
     embedding_dimension: int = 4096
-    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_base_url: str = "http://127.0.0.1:12434/v1"
     model_base_url_allowlist: str = ""
     retrieval_candidate_k: int = 20
     retrieval_max_evidence: int = 5

@@ -91,7 +91,11 @@ function createRequestId(): string {
     return crypto.randomUUID();
   }
 
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
 }
 
 // ── 组件入口 ────────────────────────────────────────────────────────
@@ -337,7 +341,7 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
   }, [messages]);
 
   useEffect(() => {
-    if (activeId || streamedSessionId == null) return;
+    if (streamedSessionId == null || activeId === streamedSessionId) return;
     if (localSessionUrlSyncRef.current === streamedSessionId) return;
 
     const streamedConversationKey =
@@ -389,13 +393,14 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
       requestIdByConversationRef.current.set(conversationKey, requestId);
       refreshAfterRequestByConversationRef.current.set(
         conversationKey,
-        activeId !== null &&
-          isNewSession(
-            sessions.find((session) => session.id === activeId) ?? {
-              title: null,
-              message_count: 0,
-            },
-          ),
+        effectiveEditId != null ||
+          (activeId !== null &&
+            isNewSession(
+              sessions.find((session) => session.id === activeId) ?? {
+                title: null,
+                message_count: 0,
+              },
+            )),
       );
 
       onRequest({
@@ -406,6 +411,11 @@ function QAPageContent({ sessionIdParam }: { sessionIdParam: string }) {
         document_ids: scopeDocumentIds.length > 0 ? scopeDocumentIds : null,
         request_id: requestId,
         edit_message_id: effectiveEditId,
+        session_version:
+          effectiveEditId == null
+            ? null
+            : (sessions.find((session) => session.id === activeId)?.version ??
+              null),
       });
     },
     [

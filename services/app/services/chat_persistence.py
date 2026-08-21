@@ -76,6 +76,7 @@ def persist_streamed_chat_message(
     answer_parts: Sequence[str],
     result_status: str,
     citations: Sequence[Mapping[str, Any]],
+    request_id: str | None = None,
 ) -> ChatMessage:
     answer = "".join(answer_parts)
     msg = ChatMessage(
@@ -83,6 +84,7 @@ def persist_streamed_chat_message(
         question=question,
         answer=answer,
         result_status=result_status,
+        request_id=request_id,
     )
     db.add(msg)
     db.flush()

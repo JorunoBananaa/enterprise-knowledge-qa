@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,12 +13,28 @@ class ChatSession(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(String(128), index=True)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    parent_session_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    branch_from_message_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    visibility: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="active",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
 
     messages: Mapped[list["ChatMessage"]] = relationship(
-        cascade="all, delete-orphan", passive_deletes=True
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="ChatMessage.session_id",
     )
 
 
@@ -30,6 +46,11 @@ class ChatMessage(Base):
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
     result_status: Mapped[str] = mapped_column(default="answered")
+    request_id: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

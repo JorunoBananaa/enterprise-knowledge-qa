@@ -7,7 +7,7 @@ Embedding 工厂 —— 创建 LangChain embedding 模型实例。
 - zhipu       → OpenAIEmbeddings（OpenAI 兼容，base_url=https://open.bigmodel.cn/api/paas/v4/）
 - qwen        → OpenAIEmbeddings（OpenAI 兼容，通过 DashScope）
 - huggingface → HuggingFaceEmbeddings（本地运行，无需 API key）
-- ollama      → OpenAIEmbeddings（OpenAI 兼容，本地 Ollama，base_url=http://localhost:11434/v1）
+- ollama      → OpenAIEmbeddings（OpenAI 兼容，本地 Ollama，base_url=http://127.0.0.1:12434/v1）
 """
 
 import threading
@@ -41,7 +41,7 @@ _EMBEDDING_REGISTRY: dict[str, tuple[str, str | None]] = {
     "zhipu":       ("OpenAIEmbeddings", "https://open.bigmodel.cn/api/paas/v4/"),
     "qwen":        ("OpenAIEmbeddings", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     "huggingface": ("HuggingFaceEmbeddings", None),
-    "ollama":      ("OpenAIEmbeddings", "http://localhost:11434/v1"),
+    "ollama":      ("OpenAIEmbeddings", "http://127.0.0.1:12434/v1"),
 }
 
 SUPPORTED_EMBEDDING_PROVIDERS = sorted(_EMBEDDING_REGISTRY.keys())

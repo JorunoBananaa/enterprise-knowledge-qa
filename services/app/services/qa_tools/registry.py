@@ -12,13 +12,9 @@ from app.services.qa_tools.document_detail import (
 )
 from app.services.qa_tools.review_approval import (
     REVIEW_APPROVAL_TOOL_NAME,
-    approve_review,
-    approve_review_tool,
 )
 from app.services.qa_tools.review_rejection import (
     REVIEW_REJECTION_TOOL_NAME,
-    reject_review,
-    reject_review_tool,
 )
 from app.services.qa_tools.review_list import (
     REVIEW_LIST_TOOL_NAME,
@@ -76,13 +72,11 @@ def execute_qa_tool_plans(
         if tool_plan.name == REVIEW_LIST_TOOL_NAME:
             results.append(get_review_list(context, _get_review_list_output_mode(tool_plan)))
         elif tool_plan.name == REVIEW_APPROVAL_TOOL_NAME:
-            results.append(approve_review(context, _get_document_id(tool_plan)))
+            results.append(_confirmation_required_result(tool_plan))
         elif tool_plan.name == DOCUMENT_DETAIL_TOOL_NAME:
             results.append(get_document_detail(context, _get_document_id(tool_plan)))
         elif tool_plan.name == REVIEW_REJECTION_TOOL_NAME:
-            results.append(
-                reject_review(context, _get_document_id(tool_plan), _get_reason(tool_plan))
-            )
+            results.append(_confirmation_required_result(tool_plan))
         elif tool_plan.name == UNSUPPORTED_TOOL_REQUEST_NAME:
             results.append(_unsupported_tool_result(tool_plan))
 
@@ -98,9 +92,7 @@ async def _select_tools(
         response = await llm.bind_tools(
             [
                 review_list_tool,
-                approve_review_tool,
                 document_detail_tool,
-                reject_review_tool,
             ]
         ).ainvoke(_build_tool_selection_messages(question, chat_history))
     except Exception:
@@ -183,6 +175,17 @@ def _unsupported_tool_result(tool_plan: QaToolPlan) -> QaToolResult:
             "请新增或启用对应工具后再试。"
         ),
         metadata={"error": "unsupported_tool_request", "question": question or None},
+    )
+
+
+def _confirmation_required_result(tool_plan: QaToolPlan) -> QaToolResult:
+    return QaToolResult(
+        name=tool_plan.name,
+        content=(
+            "聊天链路不能直接执行审批、驳回或删除等写操作。"
+            "请使用确定性的管理页面/API；如需自然语言操作，应先实现独立的准备与确认流程。"
+        ),
+        metadata={"error": "confirmation_required"},
     )
 
 
