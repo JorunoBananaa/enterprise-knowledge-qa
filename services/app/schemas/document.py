@@ -10,7 +10,6 @@ class DocumentResponse(BaseModel):
     id: int
     title: str
     file_type: str
-    storage_path: str
     uploader_id: int
     category_id: int
     review_status: str
@@ -23,7 +22,6 @@ class DocumentResponse(BaseModel):
             id=obj.id,
             title=obj.title,
             file_type=obj.file_type,
-            storage_path=obj.storage_path,
             uploader_id=obj.uploader_id,
             category_id=obj.category_id,
             review_status=obj.review_status.value if hasattr(obj.review_status, "value") else obj.review_status,

@@ -94,7 +94,6 @@ export type StreamEvent =
       document_title?: string;
       document_name?: string;
       document_file_type?: string;
-      document_storage_path?: string;
       document_path?: string;
       document_category_id?: number;
       chunk_id: number;

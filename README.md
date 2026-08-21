@@ -249,11 +249,15 @@ pnpm dev:web-app
 
 打开浏览器访问 `http://localhost:3000`
 
-**默认账号：**
-|用户名|密码|角色|
-|---|---|---|
-|`admin`|`a`|管理员|
-|`user`|`a`|普通用户|
+项目不再默认创建弱口令账号。仅在本地开发环境需要演示账号时，启动后端前显式设置：
+
+```powershell
+$env:SEED_DEVELOPMENT_USERS = "true"
+$env:DEVELOPMENT_SEED_PASSWORD = "replace-with-12-plus-chars"
+pnpm dev:services
+```
+
+这会在账号不存在时创建 `admin` 和 `user`，两者使用显式配置的开发密码。生产环境禁止启用该选项；生产管理员应通过受控的初始化流程创建。
 
 ---
 
@@ -333,20 +337,32 @@ SSE 事件：
 
 后端配置通过 `services/app/core/config.py`（Pydantic Settings）管理，支持环境变量覆盖：
 
-| 变量                          | 默认值                                                       | 说明           |
-| ----------------------------- | ------------------------------------------------------------ | -------------- |
-| `DATABASE_URL`                | `postgresql://postgres:postgres@localhost:5432/knowledge_qa` | 数据库连接串   |
-| `JWT_SECRET`                  | `local-dev-secret`                                           | JWT 签名密钥   |
-| `JWT_ALGORITHM`               | `HS256`                                                      | JWT 签名算法   |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480`                                                        | Token 有效期   |
-| `AUTH_COOKIE_NAME`            | `access_token`                                               | 认证 Cookie 名 |
-| `AUTH_COOKIE_SECURE`          | `false`                                                      | 是否仅 HTTPS   |
-| `EMBEDDING_PROVIDER`          | `huggingface`                                                | Embedding 提供商 |
-| `EMBEDDING_MODEL_NAME`        | `sentence-transformers/all-MiniLM-L6-v2`                     | Embedding 模型 |
-| `EMBEDDING_DIMENSION`         | `384`                                                        | 向量维度       |
-| `UPLOAD_DIR`                  | `storage/uploads`                                            | 文件上传目录   |
+| 变量                               | 默认值                                                        | 说明 |
+| ---------------------------------- | ------------------------------------------------------------- | ---- |
+| `ENVIRONMENT`                      | `development`                                                 | `development` / `test` / `production` |
+| `DATABASE_URL`                     | `postgresql+psycopg://postgres:postgres@localhost:5432/knowledge_qa` | 数据库连接串 |
+| `JWT_SECRET`                       | `local-dev-secret`                                            | 仅允许开发环境使用；生产至少 32 字符 |
+| `JWT_ALGORITHM`                    | `HS256`                                                       | JWT 签名算法 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES`      | `480`                                                         | Token 有效期 |
+| `AUTH_COOKIE_NAME`                 | `access_token`                                                | 认证 Cookie 名 |
+| `AUTH_COOKIE_SECURE`               | `false`                                                       | 生产环境必须为 `true` |
+| `SEED_DEVELOPMENT_USERS`           | `false`                                                       | 是否显式创建本地演示账号 |
+| `DEVELOPMENT_SEED_PASSWORD`        | 空                                                            | 演示账号密码，启用种子用户时至少 12 字符 |
+| `UPLOAD_DIR`                       | `storage/uploads`                                             | 文件上传目录 |
+| `UPLOAD_MAX_FILE_SIZE_BYTES`       | `26214400`                                                    | 单文件最大 25 MiB |
+| `UPLOAD_MAX_FILES_PER_REQUEST`     | `10`                                                          | 单次上传文件数上限 |
+| `UPLOAD_ALLOWED_EXTENSIONS`        | `.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv`                        | 允许上传且当前真正支持解析的格式 |
+| `EMBEDDING_PROVIDER`               | `ollama`                                                      | Embedding 提供商 |
+| `EMBEDDING_MODEL_NAME`             | `dengcao/Qwen3-Embedding-8B:Q4_K_M`                           | Embedding 模型 |
+| `EMBEDDING_DIMENSION`              | `4096`                                                        | 当前向量维度 |
+| `OLLAMA_BASE_URL`                  | `http://localhost:11434/v1`                                  | 本地 Ollama 地址 |
+| `MODEL_BASE_URL_ALLOWLIST`         | 空                                                            | 额外允许的模型服务完整基址，逗号分隔 |
+| `PADDLEOCR_TOKEN`                  | 空                                                            | OCR Token；没有源码默认值，未配置时 OCR 明确失败 |
+| `PADDLEOCR_RESULT_HOST_ALLOWLIST`  | `paddleocr.aistudio-app.com`                                  | 允许下载 OCR 结果的主机，逗号分隔 |
 
-> **注：** `PADDLEOCR_TOKEN`（图片 OCR，可选）不在 `config.py` 中管理，而是由 `services/app/services/ocr.py` 通过 `os.getenv('PADDLEOCR_TOKEN', ...)` 直接读取，未设置时使用代码内置的演示 Token。
+内置 LLM 提供商只能使用项目登记的官方基址。自定义或内网模型地址必须通过 `MODEL_BASE_URL_ALLOWLIST` 显式放行。OCR 返回结果如果使用其他官方对象存储域名，也必须加入 `PADDLEOCR_RESULT_HOST_ALLOWLIST`。
+
+生产启动会执行安全配置校验：默认/过短 JWT 密钥、未启用 Secure Cookie、开启开发种子用户，或数据库中仍存在历史 `admin/a`、`user/a` 弱口令，都会导致服务拒绝启动。升级已有环境前请先重置这些账号的密码。
 
 ### 开发脚本
 

@@ -16,13 +16,22 @@ def get_document_by_id(document_id: int) -> KnowledgeDocument | None:
 
 
 def create_document(data: dict[str, Any]) -> KnowledgeDocument:
+    return create_documents([data])[0]
+
+
+def create_documents(items: list[dict[str, Any]]) -> list[KnowledgeDocument]:
+    """在单个事务中创建一批文档。"""
     db = SessionLocal()
     try:
-        doc = KnowledgeDocument(**data)
-        db.add(doc)
+        documents = [KnowledgeDocument(**data) for data in items]
+        db.add_all(documents)
         db.commit()
-        db.refresh(doc)
-        return doc
+        for document in documents:
+            db.refresh(document)
+        return documents
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

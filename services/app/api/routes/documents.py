@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
+from app.core.config import settings
+from app.repositories.categories import get_category_by_id
 from app.repositories.documents import (
-    create_document,
+    create_documents,
     delete_document,
     get_document_by_id,
     list_documents,
 )
 from app.schemas.auth import CurrentUser
 from app.schemas.document import DocumentListResponse, DocumentResponse, DocumentUploadResponse
-from app.services.storage import save_upload
+from app.services.storage import UploadRejectedError, delete_upload, save_upload
 
 router = APIRouter()
 
@@ -21,7 +24,7 @@ router = APIRouter()
 def _file_type(filename: str | None) -> str:
     if not filename or "." not in filename:
         return "unknown"
-    return filename.rsplit(".", 1)[-1]
+    return filename.rsplit(".", 1)[-1].lower()
 
 
 def _title_from_filename(filename: str | None) -> str:
@@ -35,6 +38,7 @@ def _title_from_filename(filename: str | None) -> str:
 def upload_document(
     category_id: Annotated[int, Form()],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
     title: Annotated[str | None, Form()] = None,
     file: Annotated[UploadFile | None, File()] = None,
     files: Annotated[list[UploadFile] | None, File()] = None,
@@ -48,14 +52,30 @@ def upload_document(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="请选择文件",
         )
+    if len(upload_files) > settings.upload_max_files_per_request:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"单次最多上传 {settings.upload_max_files_per_request} 个文件",
+        )
+    if get_category_by_id(db, category_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="知识分类不存在",
+        )
 
-    created_docs = []
     uploader_id = current_user.id
-    for upload_file in upload_files:
-        storage_path = save_upload(upload_file)
-        doc_title = title if len(upload_files) == 1 and title else _title_from_filename(upload_file.filename)
-        created_docs.append(
-            create_document(
+    pending_documents: list[dict[str, Any]] = []
+    saved_paths: list[str] = []
+    try:
+        for upload_file in upload_files:
+            storage_path = save_upload(upload_file)
+            saved_paths.append(storage_path)
+            doc_title = (
+                title
+                if len(upload_files) == 1 and title
+                else _title_from_filename(upload_file.filename)
+            )
+            pending_documents.append(
                 {
                     "title": doc_title,
                     "file_type": _file_type(upload_file.filename),
@@ -64,7 +84,15 @@ def upload_document(
                     "category_id": category_id,
                 }
             )
-        )
+        created_docs = create_documents(pending_documents)
+    except UploadRejectedError as exc:
+        for saved_path in saved_paths:
+            delete_upload(saved_path)
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception:
+        for saved_path in saved_paths:
+            delete_upload(saved_path)
+        raise
 
     responses = [DocumentResponse.from_orm_obj(doc) for doc in created_docs]
     if len(responses) == 1 and file is not None and not files:

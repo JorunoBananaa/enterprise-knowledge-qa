@@ -423,10 +423,10 @@ export default function UsersPage() {
             label="密码"
             rules={[
               { required: true, message: "请输入密码" },
-              { min: 6, message: "密码至少6位" },
+              { min: 8, message: "密码至少8位" },
             ]}
           >
-            <Input.Password placeholder="至少6位" />
+            <Input.Password placeholder="至少8位" />
           </Form.Item>
           <Form.Item name="role" label="角色">
             <Select
@@ -488,10 +488,10 @@ export default function UsersPage() {
             label="新密码"
             rules={[
               { required: true, message: "请输入新密码" },
-              { min: 6, message: "密码至少6位" },
+              { min: 8, message: "密码至少8位" },
             ]}
           >
-            <Input.Password placeholder="至少6位" />
+            <Input.Password placeholder="至少8位" />
           </Form.Item>
         </Form>
       </Modal>

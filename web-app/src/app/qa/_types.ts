@@ -36,7 +36,6 @@ export interface CitationItem {
   document_title?: string | null;
   document_name?: string | null;
   document_file_type?: string | null;
-  document_storage_path?: string | null;
   document_path?: string | null;
   document_category_id?: number | null;
   chunk_id: number;

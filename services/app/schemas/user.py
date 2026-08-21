@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UserResponse(BaseModel):
@@ -29,9 +29,9 @@ class UserListResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
-    username: str
-    display_name: str
-    password: str
+    username: str = Field(..., min_length=1, max_length=64)
+    display_name: str = Field(..., min_length=1, max_length=128)
+    password: str = Field(..., min_length=8, max_length=128)
     role: str = "standard"
     status: str = "active"
 
@@ -43,4 +43,4 @@ class UserUpdate(BaseModel):
 
 
 class PasswordResetRequest(BaseModel):
-    new_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)

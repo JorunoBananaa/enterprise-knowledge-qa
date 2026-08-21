@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.messages import HumanMessage
 
 from app.api.deps import get_current_user, require_admin
+from app.core.url_security import validate_model_base_url
 from app.repositories.llm_config import (
     create_llm_config,
     delete_llm_config,
@@ -24,6 +25,16 @@ from app.schemas.llm_config import (
 from app.services.llm_factory import create_chat_model
 
 router = APIRouter()
+
+
+def _validated_base_url(provider: str, base_url: str | None) -> str | None:
+    try:
+        return validate_model_base_url(provider, base_url)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
 
 # ── 列出全部配置（仅管理员） ─────────────────────────────────────
@@ -53,12 +64,13 @@ def create(
     payload: LLMConfigCreate,
     _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
+    base_url = _validated_base_url(payload.provider, payload.base_url)
     cfg = create_llm_config(
         name=payload.name,
         provider=payload.provider,
         model_name=payload.model_name,
         api_key=payload.api_key,
-        base_url=payload.base_url,
+        base_url=base_url,
     )
     return LLMConfigResponse.from_orm_obj(cfg)
 
@@ -77,6 +89,9 @@ def update(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")
 
     updates = payload.model_dump(exclude_unset=True)
+    provider = str(updates.get("provider", current.provider))
+    candidate_base_url = updates.get("base_url", current.base_url)
+    updates["base_url"] = _validated_base_url(provider, candidate_base_url)
     cfg = update_llm_config(config_id, **updates)
     if cfg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")
@@ -90,6 +105,10 @@ def activate(
     config_id: int,
     _admin: Annotated[CurrentUser, Depends(require_admin)],
 ) -> LLMConfigResponse:
+    current = get_llm_config(config_id)
+    if current is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")
+    _validated_base_url(current.provider, current.base_url)
     cfg = set_active_llm_config(config_id)
     if cfg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配置不存在")

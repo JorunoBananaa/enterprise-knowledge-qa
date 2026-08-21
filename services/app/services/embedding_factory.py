@@ -16,6 +16,8 @@ from typing import Any
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
+from app.core.url_security import validate_model_base_url
+
 
 class _OllamaEmbeddings(OpenAIEmbeddings):
     """适配 Ollama 单字符串 /v1/embeddings 的 OpenAIEmbeddings 包装类。
@@ -62,7 +64,7 @@ def _instantiate_embeddings(
 ) -> Embeddings:
     """创建全新的 Embeddings 实例（较慢，可能加载模型权重）。"""
     cls_name, default_base = _EMBEDDING_REGISTRY[provider]
-    resolved_base = base_url or default_base
+    resolved_base = validate_model_base_url(provider, base_url or default_base)
 
     if cls_name == "OpenAIEmbeddings":
         # Ollama 本地运行且不需要 API key，但 OpenAI 客户端拒绝空字符串，

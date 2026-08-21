@@ -396,7 +396,6 @@ async def _retrieve_chunks(
             "document_title": document.title,
             "document_name": document.title,
             "document_file_type": document.file_type,
-            "document_storage_path": document.storage_path,
             "document_path": category_paths.get(document.category_id),
             "document_category_id": document.category_id,
             "locator": chunk.locator,
@@ -508,7 +507,6 @@ def get_session(
                     document_title=document.title if document else None,
                     document_name=document.title if document else None,
                     document_file_type=document.file_type if document else None,
-                    document_storage_path=document.storage_path if document else None,
                     document_path=(
                         category_paths.get(document.category_id) if document else None
                     ),

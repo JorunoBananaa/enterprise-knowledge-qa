@@ -20,6 +20,8 @@ from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from app.core.url_security import validate_model_base_url
+
 
 # ── 提供商 → (ChatModel 类, 默认 base_url) ────────────────────
 
@@ -56,7 +58,7 @@ def _resolve_model_kwargs(
             "model": model_name,
             "openai_api_key": api_key,
         }
-        resolved_base = base_url or default_base
+        resolved_base = validate_model_base_url(provider, base_url or default_base)
         if resolved_base:
             kwargs["base_url"] = resolved_base
     elif cls_name == "ChatAnthropic":
@@ -64,8 +66,9 @@ def _resolve_model_kwargs(
             "model": model_name,
             "anthropic_api_key": api_key,
         }
-        if base_url:
-            kwargs["base_url"] = base_url
+        resolved_base = validate_model_base_url(provider, base_url)
+        if resolved_base:
+            kwargs["base_url"] = resolved_base
 
     return kwargs
 

@@ -13,7 +13,6 @@ interface Document {
   id: number;
   title: string;
   file_type: string;
-  storage_path: string;
   uploader_id: number;
   category_id: number;
   review_status: string;
@@ -70,9 +69,6 @@ export default function DocumentDetailPage() {
           </Descriptions.Item>
           <Descriptions.Item label="索引状态">
             <DocumentStatusBadge status={doc.index_status} />
-          </Descriptions.Item>
-          <Descriptions.Item label="存储路径" span={2}>
-            <code>{doc.storage_path}</code>
           </Descriptions.Item>
         </Descriptions>
 
