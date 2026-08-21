@@ -6,6 +6,8 @@
   "scripts": {
     "init": "cd web-app && pnpm install",
     "dev:web-app": "pnpm --dir web-app dev",
+    "build:web-app": "pnpm --dir web-app build",
+    "start:web-app": "pnpm --dir web-app start",
     "dev:services": "node scripts/dev-services.mjs"
   },
   "keywords": [],

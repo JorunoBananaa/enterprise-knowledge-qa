@@ -2,9 +2,12 @@ const apiProxyTarget = (
   process.env.API_PROXY_TARGET || "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 
+const outputConfig =
+  process.platform === "win32" ? {} : { output: "standalone" };
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  ...outputConfig,
   reactStrictMode: false,
   skipTrailingSlashRedirect: true,
   experimental: {
