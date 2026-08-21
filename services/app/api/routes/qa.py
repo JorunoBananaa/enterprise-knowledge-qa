@@ -15,7 +15,6 @@ from app.core.config import settings
 from app.models.chat import ChatMessage, ChatSession, Citation
 from app.models.document import KnowledgeDocument
 from app.models.category import KnowledgeCategory
-from app.models.document_chunk import DocumentChunk
 from app.repositories.llm_config import get_active_llm_config, get_llm_config
 from app.repositories.prompts import get_system_prompt_content, get_user_prompt
 from app.schemas.auth import CurrentUser
@@ -42,6 +41,12 @@ from app.services.chat_persistence import (
 from app.services.llm_factory import create_chat_model
 from app.services.qa_orchestrator import QaStreamInput, stream_qa_events
 from app.services.qa_tools import QaToolContext
+from app.services.retrieval import (
+    EvidencePolicy,
+    KnowledgeRetriever,
+    Principal,
+    RetrievalScope,
+)
 from app.services.rag import (
     answer_question_stream,
     answer_tool_results_stream,
@@ -49,6 +54,7 @@ from app.services.rag import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 CHAT_HISTORY_LIMIT = 6
 SSE_HEADERS = {
@@ -352,59 +358,6 @@ def _compute_query_embedding(question: str) -> list[float]:
     return embed_model.embed_query(question)
 
 
-async def _retrieve_chunks(
-    question: str,
-    db: Session,
-    top_k: int = 5,
-    target_document_ids: list[int] | None = None,
-) -> list[dict[str, Any]]:
-    """通过 pgvector ANN 搜索检索最相关的文档块。
-
-    先为问题生成 embedding，再在 document_chunks 表中执行余弦相似度搜索。
-
-    当提供 `target_document_ids` 时，只检索这些文档下的块。
-
-    embedding 计算放在工作线程中执行，避免缓慢的模型加载或推理阻塞事件循环，
-    否则 POST /sessions 等并发请求可能得不到调度。
-    """
-    if target_document_ids == []:
-        return []
-
-    query_embedding = await asyncio.to_thread(_compute_query_embedding, question)
-
-    query = db.query(DocumentChunk, KnowledgeDocument).join(
-        KnowledgeDocument,
-        KnowledgeDocument.id == DocumentChunk.document_id,
-    )
-    if target_document_ids is not None:
-        query = query.filter(DocumentChunk.document_id.in_(target_document_ids))
-
-    rows = (
-        query
-        .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
-        .limit(top_k)
-        .all()
-    )
-    if not rows:
-        return []
-
-    category_paths = _build_category_path_map(db)
-    return [
-        {
-            "chunk_id": chunk.id,
-            "document_id": chunk.document_id,
-            "document_title": document.title,
-            "document_name": document.title,
-            "document_file_type": document.file_type,
-            "document_path": category_paths.get(document.category_id),
-            "document_category_id": document.category_id,
-            "locator": chunk.locator,
-            "text": chunk.text,
-        }
-        for chunk, document in rows
-    ]
-
-
 # ── 会话 ──────────────────────────────────────────────────────────
 
 @router.get("/sessions", response_model=list[ChatSessionOut])
@@ -694,15 +647,49 @@ async def ask_question_stream(
         system_prompt, user_prompt = _resolve_prompts(current_user.id)
         chat_history = _load_chat_history(session.id, db)
 
+        async def embed_query_for_retrieval(question: str) -> list[float]:
+            return await asyncio.to_thread(_compute_query_embedding, question)
+
+        retriever = KnowledgeRetriever(
+            db,
+            embed_query=embed_query_for_retrieval,
+            candidate_k=settings.retrieval_candidate_k,
+        )
+        evidence_policy = EvidencePolicy(
+            min_similarity=settings.retrieval_min_similarity,
+            max_evidence=settings.retrieval_max_evidence,
+            policy_id=settings.retrieval_policy_id,
+        )
+
         async def retrieve_chunks_for_graph(
             retrieval_question: str,
             target_document_ids_for_graph: list[int] | None,
         ) -> list[dict[str, Any]]:
-            return await _retrieve_chunks(
-                retrieval_question,
-                db,
-                target_document_ids=target_document_ids_for_graph,
+            result = await retriever.search(
+                query=retrieval_question,
+                principal=Principal(
+                    user_id=current_user.id,
+                    role=current_user.role,
+                ),
+                scope=RetrievalScope(
+                    document_ids=(
+                        None
+                        if target_document_ids_for_graph is None
+                        else tuple(target_document_ids_for_graph)
+                    )
+                ),
+                policy=evidence_policy,
             )
+            logger.info(
+                "retrieval_decision policy_id=%s decision=%s reason=%s "
+                "candidate_count=%d evidence_count=%d",
+                result.policy_id,
+                result.decision.value,
+                result.reason,
+                len(result.candidates),
+                len(result.evidence),
+            )
+            return result.to_context_chunks()
 
         if await _should_stop():
             _persist_pre_stream_abort()

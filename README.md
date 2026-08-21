@@ -357,10 +357,16 @@ SSE 事件：
 | `EMBEDDING_DIMENSION`              | `4096`                                                        | 当前向量维度 |
 | `OLLAMA_BASE_URL`                  | `http://localhost:11434/v1`                                  | 本地 Ollama 地址 |
 | `MODEL_BASE_URL_ALLOWLIST`         | 空                                                            | 额外允许的模型服务完整基址，逗号分隔 |
+| `RETRIEVAL_CANDIDATE_K`            | `20`                                                          | 状态与范围硬过滤后的向量召回候选上限 |
+| `RETRIEVAL_MAX_EVIDENCE`           | `5`                                                           | 最多允许进入生成与引用链路的证据数 |
+| `RETRIEVAL_MIN_SIMILARITY`         | `0.50`                                                        | 首版余弦相似度拒答基线，生产使用前必须用评测集校准 |
+| `RETRIEVAL_POLICY_ID`              | `cosine-initial-v1`                                           | 证据策略版本，用于日志、评测和阈值追踪 |
 | `PADDLEOCR_TOKEN`                  | 空                                                            | OCR Token；没有源码默认值，未配置时 OCR 明确失败 |
 | `PADDLEOCR_RESULT_HOST_ALLOWLIST`  | `paddleocr.aistudio-app.com`                                  | 允许下载 OCR 结果的主机，逗号分隔 |
 
 内置 LLM 提供商只能使用项目登记的官方基址。自定义或内网模型地址必须通过 `MODEL_BASE_URL_ALLOWLIST` 显式放行。OCR 返回结果如果使用其他官方对象存储域名，也必须加入 `PADDLEOCR_RESULT_HOST_ALLOWLIST`。
+
+当前权限模型没有文档/分类 ACL。问答检索的 V1 可见性语义是：所有已认证用户只能检索审核通过、已完成索引且位于请求范围内的公共知识；管理员也不会通过问答链路读取待审核内容。需要部门或用户级隔离时，应先增加授权表并在同一 SQL 查询内硬过滤。
 
 生产启动会执行安全配置校验：默认/过短 JWT 密钥、未启用 Secure Cookie、开启开发种子用户，或数据库中仍存在历史 `admin/a`、`user/a` 弱口令，都会导致服务拒绝启动。升级已有环境前请先重置这些账号的密码。
 

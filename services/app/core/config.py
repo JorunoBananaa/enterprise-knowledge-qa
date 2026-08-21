@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     embedding_dimension: int = 4096
     ollama_base_url: str = "http://localhost:11434/v1"
     model_base_url_allowlist: str = ""
+    retrieval_candidate_k: int = 20
+    retrieval_max_evidence: int = 5
+    retrieval_min_similarity: float = 0.50
+    retrieval_policy_id: str = "cosine-initial-v1"
 
     paddleocr_token: str | None = None
     paddleocr_http_timeout_seconds: float = 30.0
@@ -64,6 +68,20 @@ class Settings(BaseSettings):
             raise ValueError("UPLOAD_MAX_FILE_SIZE_BYTES 必须大于 0")
         if self.upload_max_files_per_request <= 0:
             raise ValueError("UPLOAD_MAX_FILES_PER_REQUEST 必须大于 0")
+        if self.retrieval_candidate_k <= 0:
+            raise ValueError("RETRIEVAL_CANDIDATE_K must be greater than 0")
+        if self.retrieval_max_evidence <= 0:
+            raise ValueError("RETRIEVAL_MAX_EVIDENCE must be greater than 0")
+        if self.retrieval_max_evidence > self.retrieval_candidate_k:
+            raise ValueError(
+                "RETRIEVAL_MAX_EVIDENCE must not exceed RETRIEVAL_CANDIDATE_K"
+            )
+        if not -1.0 <= self.retrieval_min_similarity <= 1.0:
+            raise ValueError(
+                "RETRIEVAL_MIN_SIMILARITY must be between -1.0 and 1.0"
+            )
+        if not self.retrieval_policy_id.strip():
+            raise ValueError("RETRIEVAL_POLICY_ID must not be blank")
         return self
 
 
